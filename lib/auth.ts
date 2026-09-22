@@ -114,8 +114,16 @@ const admins = () =>
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
 
-export const isAdmin = (u: Pick<User, 'role' | 'username'> | null) =>
-  Boolean(u && (u.role === 'admin' || (u.username && admins().includes(u.username.toLowerCase()))));
+/** Админ — роль admin в базе или совпадение с BOOTCAMP_ADMINS: логин, почта Google или @ник в Telegram. */
+export function isAdmin(u: (Pick<User, 'role' | 'username'> & Partial<Pick<User, 'email' | 'tg_username'>>) | null): boolean {
+  if (!u) return false;
+  if (u.role === 'admin') return true;
+  const list = admins();
+  const ids = [u.username, u.email, u.tg_username ? `@${u.tg_username}` : null]
+    .filter(Boolean)
+    .map((s) => String(s).toLowerCase());
+  return ids.some((x) => list.includes(x));
+}
 
 export async function currentUser(): Promise<User | null> {
   if (!hasDb()) return null;
