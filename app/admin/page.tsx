@@ -1,0 +1,47 @@
+import Shell from '@/components/Shell';
+import AdminPanel from '@/components/AdminPanel';
+import { requireAdmin } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { studentOfUser } from '@/lib/data';
+
+export const dynamic = 'force-dynamic';
+export const metadata = { title: 'Админка' };
+
+export default async function Admin() {
+  const user = await requireAdmin();
+  const me = await studentOfUser(user.id);
+
+  const [students, groups, members, scores, events, users] = await Promise.all([
+    db`select s.id, s.name, s.phone, s.note, s.access, s.exam_name, to_char(s.exam_date, 'YYYY-MM-DD') as exam_date, s.exam_city,
+         s.target_score, s.user_id, u.username, u.name as user_name, u.tg_username, u.email,
+         to_char(u.last_seen, 'YYYY-MM-DD') as last_seen
+       from bc_students s left join bc_users u on u.id = s.user_id
+       order by s.created_at desc`,
+    db`select id, course, name, teacher, schedule, to_char(starts, 'YYYY-MM-DD') as starts, to_char(ends, 'YYYY-MM-DD') as ends,
+         total_lessons, link, chat, materials, color from bc_groups order by course, name`,
+    db`select student_id, group_id from bc_members`,
+    db`select id, student_id, title, value::float as value, max::float as max, teacher, to_char(date, 'YYYY-MM-DD') as date
+       from bc_scores order by date desc, id desc`,
+    db`select id, group_id, student_id, kind, title, to_char(at at time zone ${process.env.BOOTCAMP_TZ || 'Asia/Tashkent'}, 'YYYY-MM-DD HH24:MI') as at
+       from bc_events where at > now() - interval '7 days' order by at`,
+    db`select count(*)::int as n from bc_users`,
+  ]);
+
+  return (
+    <Shell user={user} student={me} active="admin">
+      <div className="top">
+        <div>
+          <h1>Админка</h1>
+          <p>Ученики и их ID, группы, расписание, доступ и баллы. Зарегистрировано аккаунтов: {users[0]?.n ?? 0}.</p>
+        </div>
+      </div>
+      <AdminPanel
+        students={students as any}
+        groups={groups as any}
+        members={members as any}
+        scores={scores as any}
+        events={events as any}
+      />
+    </Shell>
+  );
+}
