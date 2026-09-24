@@ -55,7 +55,8 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
           time: s.start,
           html: (
             <div className="ev tr" style={{ borderColor: color(g.id), background: `${color(g.id)}1a` }}>
-              <b>{s.start}–{s.end}</b>{g.course}<i>{g.name || g.teacher || ''}</i>
+              <b>{s.start}–{s.end}</b>{g.course}
+              <i>{g.kind === 'solo' ? `индивидуально${g.teacher ? ` · ${g.teacher}` : ''}` : g.name || g.teacher || ''}</i>
             </div>
           ),
         });
@@ -100,7 +101,7 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
       {!student ? (
         <div className="card empty-card">
           <h2>Привяжи ID ученика</h2>
-          <p>Расписание занятий твоей группы появится здесь после привязки ID.</p>
+          <p>Расписание твоих занятий появится здесь после привязки ID.</p>
           <div style={{ maxWidth: 420, margin: '0 auto' }}><LinkIdForm /></div>
         </div>
       ) : !allowed ? (
@@ -126,7 +127,11 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
                     <span className="date-box"><b>{dateShort(l.date).day}</b><span>{dateShort(l.date).mon}</span></span>
                     <span className="txt">
                       <b>{l.group.course}{l.group.name ? ` · ${l.group.name}` : ''}</b>
-                      <i>{whenRu(now.date, l.date)}, {l.start}–{l.end}{l.group.teacher ? ` · ${l.group.teacher}` : ''}</i>
+                      <i>
+                        {whenRu(now.date, l.date)}, {l.start}–{l.end}
+                        {l.group.kind === 'solo' ? ' · индивидуально' : ''}
+                        {l.group.teacher ? ` · ${l.group.teacher}` : ''}
+                      </i>
                     </span>
                     {l.group.link ? <a className="go" href={l.group.link} target="_blank" rel="noopener noreferrer">Ссылка →</a> : null}
                   </li>
