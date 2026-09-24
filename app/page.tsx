@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Shell from '@/components/Shell';
 import LinkIdForm from '@/components/LinkIdForm';
-import { ExamCard, MAIN, NextLessonCard, ScoreChart, SECTION_RU, SectionBars, tone } from '@/components/widgets';
+import { ExamCard, NextLessonCard, ScoreChart, SECTION_RU, SectionBars, tone } from '@/components/widgets';
 import { requireUser } from '@/lib/auth';
 import {
   addDays, can, eventsOf, examOf, groupsOfStudent, nowInTz, progressOf, scoresOf, studentOfUser, upcomingLessons,
@@ -43,7 +43,8 @@ export default async function Home() {
           <p>Сегодня {DOW_FULL[now.dow - 1]}, {dateRu(now.date, false)}.</p>
         </div>
         <div className="top-actions">
-          <a className="btn btn-primary" href={`${MAIN}/practice`} target="_blank" rel="noopener noreferrer">Решать задачи</a>
+          <Link className="btn btn-ghost" href="/trainer">Тренажёр</Link>
+          <Link className="btn btn-primary" href="/exam">Пробник</Link>
         </div>
       </div>
 
@@ -57,7 +58,26 @@ export default async function Home() {
         </div>
       ) : null}
 
-      <div className="grid g-2">
+      <div className="modes">
+        <Link className="mode" href="/exam">
+          <b>Пробники</b>
+          <i>Полный формат 80 задач за 100 минут, половина, быстрая диагностика и отдельные разделы. Балл 0–500 и разбор каждой задачи.</i>
+        </Link>
+        <Link className="mode" href="/trainer">
+          <b>Тренажёр по темам</b>
+          <i>82 темы по учебникам Galata: задача — ответ — разбор сразу. Всё решённое идёт в прогресс.</i>
+        </Link>
+        <Link className="mode" href="/mistakes">
+          <b>Работа над ошибками</b>
+          <i>Задачи, где последний ответ был неверным. Решишь правильно — задача уходит из списка.</i>
+        </Link>
+        <Link className="mode flame" href="/survival">
+          <b>Режим выживания</b>
+          <i>Задачи без конца, три жизни, серия. Лучшая серия попадает в таблицу лидеров школы.</i>
+        </Link>
+      </div>
+
+      <div className="grid g-2 mt">
         <ExamCard exam={exam} today={now.date} lastScore={lastScore} />
         <NextLessonCard lesson={lessons[0] || null} today={now.date} />
       </div>
@@ -97,7 +117,7 @@ export default async function Home() {
                 <li key={t.topic}>
                   <span className="txt"><b>{t.label}</b><i>{SECTION_RU[t.section || ''] || 'Тема'} · {t.total} {plural(t.total, 'задача', 'задачи', 'задач')}</i></span>
                   <span className={`pct ${tone(t.pct)}`}>{t.pct} %</span>
-                  <a className="go" href={`${MAIN}/practice?topic=${encodeURIComponent(t.topic)}`} target="_blank" rel="noopener noreferrer">Тренировать →</a>
+                  <Link className="go" href={`/trainer/${encodeURIComponent(t.topic)}`}>Тренировать →</Link>
                 </li>
               ))}
             </ul>
