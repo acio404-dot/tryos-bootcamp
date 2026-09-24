@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import Shell from '@/components/Shell';
 import LinkIdForm from '@/components/LinkIdForm';
+import ModeCards from '@/components/ModeCards';
 import { ExamCard, NextLessonCard, ScoreChart, SECTION_RU, SectionBars, tone } from '@/components/widgets';
 import { requireUser } from '@/lib/auth';
 import {
   addDays, can, eventsOf, examOf, groupsOfStudent, nowInTz, progressOf, scoresOf, studentOfUser, upcomingLessons,
 } from '@/lib/data';
+import { mistakeCount, myBestSurvival } from '@/lib/runs';
 import { DOW_FULL, dateRu, firstName, plural } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -16,10 +18,12 @@ export default async function Home() {
   const now = nowInTz();
   const access = student?.access;
 
-  const [groups, progress, scores] = await Promise.all([
+  const [groups, progress, scores, mistakes, bestStreak] = await Promise.all([
     student && can(access, 'schedule') ? groupsOfStudent(student.id) : Promise.resolve([]),
     progressOf(user.id),
     student && can(access, 'scores') ? scoresOf(student.id) : Promise.resolve([]),
+    mistakeCount(user.id),
+    myBestSurvival(user.id),
   ]);
   const lessons = upcomingLessons(groups, 14, 1);
   const events = student && can(access, 'schedule')
@@ -58,24 +62,7 @@ export default async function Home() {
         </div>
       ) : null}
 
-      <div className="modes">
-        <Link className="mode" href="/exam">
-          <b>Пробники</b>
-          <i>Полный формат 80 задач за 100 минут, половина, быстрая диагностика и отдельные разделы. Балл 0–500 и разбор каждой задачи.</i>
-        </Link>
-        <Link className="mode" href="/trainer">
-          <b>Тренажёр по темам</b>
-          <i>82 темы по учебникам Galata: задача — ответ — разбор сразу. Всё решённое идёт в прогресс.</i>
-        </Link>
-        <Link className="mode" href="/mistakes">
-          <b>Работа над ошибками</b>
-          <i>Задачи, где последний ответ был неверным. Решишь правильно — задача уходит из списка.</i>
-        </Link>
-        <Link className="mode flame" href="/survival">
-          <b>Режим выживания</b>
-          <i>Задачи без конца, три жизни, серия. Лучшая серия попадает в таблицу лидеров школы.</i>
-        </Link>
-      </div>
+      <ModeCards mistakes={mistakes} best={bestStreak} />
 
       <div className="grid g-2 mt">
         <ExamCard exam={exam} today={now.date} lastScore={lastScore} />
