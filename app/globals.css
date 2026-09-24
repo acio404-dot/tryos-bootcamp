@@ -269,6 +269,8 @@ button{font:inherit;cursor:pointer}
 .checks{display:flex;flex-wrap:wrap;gap:8px}
 .check{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;border:1.5px solid rgba(11,22,38,.12);font-size:14px;font-weight:600;cursor:pointer;background:#fff}
 .check input{accent-color:var(--teal-deep)}
+/* тот же вид, но не кликается: показываем привязку, менять её надо в другом месте */
+.check.as-tag{cursor:default;background:rgba(11,22,38,.03);color:var(--ink-2)}
 .btn-sm{padding:8px 14px;font-size:13px}
 .btn-danger{background:#fff;border-color:rgba(224,72,63,.35);color:#B8352D}
 .linklike{background:none;border:0;padding:0;color:var(--teal-deep);font-weight:800;cursor:pointer;font-size:13px}
