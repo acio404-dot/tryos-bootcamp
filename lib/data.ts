@@ -80,12 +80,28 @@ export async function groupsOfStudent(studentId: string): Promise<Group[]> {
     where m.student_id = ${studentId} order by g.course`;
 }
 
-export interface EventRow { id: number; group_id: number | null; student_id: string | null; kind: string; title: string; at: string }
+export interface EventRow {
+  id: number;
+  group_id: number | null;
+  student_id: string | null;
+  kind: string;
+  title: string;
+  at: string;
+  /** Дата и время в часовом поясе школы — их и показываем ученику. */
+  day: string;
+  time: string;
+  link: string | null;
+  note: string | null;
+}
 
+/** События ученика: его личные, его групп и общешкольные (scope = 'all'). */
 export async function eventsOf(studentId: string, groupIds: number[], fromIso: string, toIso: string): Promise<EventRow[]> {
-  return db<EventRow>`select id, group_id, student_id, kind, title, to_char(at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as at
+  return db<EventRow>`select id, group_id, student_id, kind, title, link, note,
+      to_char(at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as at,
+      to_char(at at time zone ${TZ}, 'YYYY-MM-DD') as day,
+      to_char(at at time zone ${TZ}, 'HH24:MI') as time
     from bc_events
-    where (student_id = ${studentId} or group_id = any(${groupIds}::int[]))
+    where (scope = 'all' or student_id = ${studentId} or group_id = any(${groupIds}::int[]))
       and at >= ${fromIso}::timestamptz and at < ${toIso}::timestamptz
     order by at`;
 }

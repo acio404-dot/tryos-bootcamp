@@ -5,6 +5,7 @@
  * первым делом проверяет, что вошёл администратор.
  */
 
+import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { db, one } from './db';
 import { currentUser, isAdmin } from './auth';
@@ -236,26 +237,94 @@ export async function deleteGroup(id: number): Promise<AdminResult> {
 
 /* ------------------------------------------- события: сроки, доп. занятия */
 
+const KINDS = ['deadline', 'lesson', 'exam'];
+const TZONE = () => process.env.BOOTCAMP_TZ || 'Asia/Tashkent';
+
+/** Общая проверка полей события. Возвращает либо текст ошибки, либо готовые значения. */
+function eventFields(input: { kind?: string; title?: string; date?: string; time?: string; link?: unknown; note?: unknown }) {
+  const title = clean(input.title, 140);
+  const date = dateOrNull(input.date);
+  if (!title || !date) return 'Укажи название и дату';
+  const kind = KINDS.includes(input.kind || '') ? String(input.kind) : 'deadline';
+  // Срок сдачи без времени — до конца дня; занятие и тест по умолчанию с утра.
+  const time = HHMM.test(input.time || '') ? String(input.time) : kind === 'deadline' ? '23:59' : '10:00';
+  return { kind, title, at: `${date} ${time}`, link: url(input.link), note: clean(input.note, 300) };
+}
+
+/** Одно событие для группы или ученика — из карточки группы и карточки ученика. */
 export async function addEvent(input: { groupId?: number | null; studentId?: string | null; kind: string; title: string; date: string; time?: string }): Promise<AdminResult> {
   const err = await guard();
   if (err) return { error: err };
-  const title = clean(input.title, 140);
-  const date = dateOrNull(input.date);
-  const time = HHMM.test(input.time || '') ? input.time : '23:59';
-  if (!title || !date) return { error: 'Укажи название и дату' };
+  const f = eventFields(input);
+  if (typeof f === 'string') return { error: f };
   if (!input.groupId && !input.studentId) return { error: 'Выбери группу или ученика' };
-  const kind = ['deadline', 'lesson', 'exam'].includes(input.kind) ? input.kind : 'deadline';
-  const tz = process.env.BOOTCAMP_TZ || 'Asia/Tashkent';
   await db`insert into bc_events (group_id, student_id, kind, title, at)
-    values (${input.groupId || null}, ${input.studentId || null}, ${kind}, ${title}, (${`${date} ${time}`}::timestamp at time zone ${tz}))`;
+    values (${input.groupId || null}, ${input.studentId || null}, ${f.kind}, ${f.title}, (${f.at}::timestamp at time zone ${TZONE()}))`;
   revalidatePath('/', 'layout');
   return { ok: true };
+}
+
+export interface EventInput {
+  kind: string;
+  title: string;
+  date: string;
+  time?: string;
+  link?: string;
+  note?: string;
+  /** Кому: всем ученикам школы, выбранным группам или выбранным ученикам. */
+  audience: 'all' | 'groups' | 'students';
+  groups?: number[];
+  students?: string[];
+}
+
+/**
+ * Назначает доп. занятие, пробный экзамен или срок сразу нескольким адресатам.
+ * На каждого адресата заводится своя строка, все они связаны общим batch —
+ * так событие можно удалить целиком, а расписание ученика остаётся простым.
+ */
+export async function addEvents(input: EventInput): Promise<AdminResult> {
+  const err = await guard();
+  if (err) return { error: err };
+  const f = eventFields(input);
+  if (typeof f === 'string') return { error: f };
+
+  const batch = randomUUID();
+  const tz = TZONE();
+  const ins = (groupId: number | null, studentId: string | null, scope: 'all' | 'target') =>
+    db`insert into bc_events (group_id, student_id, kind, title, at, scope, batch, link, note)
+      values (${groupId}, ${studentId}, ${f.kind}, ${f.title}, (${f.at}::timestamp at time zone ${tz}), ${scope}, ${batch}, ${f.link}, ${f.note})`;
+
+  if (input.audience === 'all') {
+    await ins(null, null, 'all');
+  } else if (input.audience === 'groups') {
+    const ids = (input.groups || []).map(intOrNull).filter((x): x is number => x !== null);
+    if (!ids.length) return { error: 'Выбери хотя бы одну группу' };
+    for (const id of ids) await ins(id, null, 'target');
+  } else {
+    const ids = (input.students || []).map((s) => clean(s, 40)).filter((x): x is string => Boolean(x));
+    if (!ids.length) return { error: 'Выбери хотя бы одного ученика' };
+    for (const id of ids) await ins(null, id, 'target');
+  }
+
+  revalidatePath('/', 'layout');
+  return { ok: true, id: batch };
 }
 
 export async function deleteEvent(id: number): Promise<AdminResult> {
   const err = await guard();
   if (err) return { error: err };
   await db`delete from bc_events where id = ${id}`;
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+/** Удаляет назначение целиком — все строки, созданные одним действием. */
+export async function deleteEventBatch(batch: string): Promise<AdminResult> {
+  const err = await guard();
+  if (err) return { error: err };
+  const key = clean(batch, 64);
+  if (!key) return { error: 'Нечего удалять' };
+  await db`delete from bc_events where batch = ${key}`;
   revalidatePath('/', 'layout');
   return { ok: true };
 }

@@ -97,6 +97,14 @@ function ensureSchema(): Promise<void> {
         at timestamptz not null,
         created_at timestamptz not null default now()
       )`;
+      // scope = 'all' — событие для всех учеников школы; 'target' — для группы
+      // или ученика из этой же строки. batch связывает строки, созданные одним
+      // назначением (например, доп. занятие сразу для трёх групп).
+      await q`alter table bc_events add column if not exists scope text not null default 'target'`;
+      await q`alter table bc_events add column if not exists batch text`;
+      await q`alter table bc_events add column if not exists link text`;
+      await q`alter table bc_events add column if not exists note text`;
+      await q`create index if not exists bc_events_at on bc_events (at)`;
       await q`create table if not exists bc_attempts (
         id bigserial primary key,
         user_id text not null,
