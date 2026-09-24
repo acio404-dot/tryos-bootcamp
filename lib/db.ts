@@ -117,6 +117,40 @@ function ensureSchema(): Promise<void> {
         total int not null default 0,
         created_at timestamptz not null default now()
       )`;
+      // Пробник: вариант хранится на сервере, чтобы перезагрузка страницы
+      // не обнуляла стомнутный тест.
+      await q`create table if not exists bc_exam_runs (
+        id text primary key,
+        user_id text not null,
+        format text not null,
+        title text not null,
+        minutes int not null,
+        ids jsonb not null,
+        answers jsonb not null default '[]'::jsonb,
+        score int,
+        correct int not null default 0,
+        wrong int not null default 0,
+        blank int not null default 0,
+        started_at timestamptz not null default now(),
+        finished_at timestamptz
+      )`;
+      await q`create index if not exists bc_exam_runs_user on bc_exam_runs (user_id, started_at desc)`;
+      // Режим выживания: серия считается на сервере, иначе таблицу лидеров
+      // можно было бы нарисовать из браузера.
+      await q`create table if not exists bc_survival (
+        id text primary key,
+        user_id text not null,
+        streak int not null default 0,
+        best int not null default 0,
+        lives int not null default 3,
+        asked int not null default 0,
+        cur_id text,
+        seen jsonb not null default '[]'::jsonb,
+        alive boolean not null default true,
+        started_at timestamptz not null default now(),
+        ended_at timestamptz
+      )`;
+      await q`create index if not exists bc_survival_board on bc_survival (best desc, ended_at)`;
     })().catch((e) => {
       ready = null;
       throw e;

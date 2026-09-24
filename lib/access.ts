@@ -1,12 +1,13 @@
 /* Доступ по ID ученика — общий для сервера и браузера (без базы). */
 
-export type Section = 'courses' | 'schedule' | 'scores' | 'materials';
+export type Section = 'courses' | 'schedule' | 'scores' | 'materials' | 'exams';
 
 export const SECTIONS: { key: Section; label: string }[] = [
   { key: 'courses', label: 'Курсы и группа' },
   { key: 'schedule', label: 'Расписание' },
   { key: 'scores', label: 'Баллы и оценки преподавателей' },
   { key: 'materials', label: 'Материалы курса и чат группы' },
+  { key: 'exams', label: 'Большие пробники (80 задач и другие форматы)' },
 ];
 
 export interface Access {

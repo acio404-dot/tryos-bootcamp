@@ -1,0 +1,431 @@
+/*
+ * Банк задач кабинета. Только сервер: файлы весят около 10 МБ, в браузер
+ * они не уходят никогда — наружу отдаются только PublicQuestion без ответа.
+ *
+ * Два независимых банка:
+ *   PRACTICE — тренажёр, работа над ошибками, режим выживания;
+ *   EXAM     — пробники. Задачи пробников не встречаются в тренажёре,
+ *              поэтому вариант нельзя «выучить» заранее.
+ */
+
+import ex1 from '@/content/bank-v2-iq-1.json';
+import ex2 from '@/content/bank-v2-iq-2.json';
+import ex3 from '@/content/bank-v2-iq-3.json';
+import ex4 from '@/content/bank-v2-algebra-1.json';
+import ex5 from '@/content/bank-v2-geometry-1.json';
+import ex6 from '@/content/bank-v2-geometry-2.json';
+import pr1 from '@/content/bank-v2-practice-1.json';
+import pr2 from '@/content/bank-v2-practice-2.json';
+import pr3 from '@/content/bank-v2-practice-3.json';
+import pr4 from '@/content/bank-v2-practice-4.json';
+
+import {
+  FORMATS, SECTION_BOOK, SECTION_LABEL, formatByKey,
+  type ExamFormat, type ExamResult, type FormatSpec, type Group,
+  type PartResult, type PublicQuestion, type Section, type Topic, type Verdict,
+} from './bank-types';
+
+export interface Item {
+  id: string;
+  topic: string;
+  topicLabel: string;
+  section: Section;
+  text: string;
+  options: string[];
+  correct: number;
+  explanation: string;
+  figure?: string;
+  difficulty?: string;
+}
+
+const asItems = (v: unknown) => v as unknown as Item[];
+
+export const PRACTICE: Item[] = [
+  ...asItems(pr1), ...asItems(pr2), ...asItems(pr3), ...asItems(pr4),
+];
+
+export const EXAM: Item[] = [
+  ...asItems(ex1), ...asItems(ex2), ...asItems(ex3),
+  ...asItems(ex4), ...asItems(ex5), ...asItems(ex6),
+];
+
+/** Задача по id — ищем в обоих банках. */
+const BY_ID = new Map<string, Item>();
+for (const q of PRACTICE) BY_ID.set(q.id, q);
+for (const q of EXAM) BY_ID.set(q.id, q);
+
+const BY_TOPIC = new Map<string, Item[]>();
+for (const q of PRACTICE) {
+  const list = BY_TOPIC.get(q.topic) || [];
+  list.push(q);
+  BY_TOPIC.set(q.topic, list);
+}
+
+export const TOTAL_PRACTICE = PRACTICE.length;
+export const TOTAL_EXAM = EXAM.length;
+
+/* --------------------------------------------------------------- каталог */
+
+const EXAM_SOURCE = 'формат экзамена TR-YÖS';
+
+/** [тема, раздел учебника] — по возрастанию страниц. */
+const ORDER: Record<Section, [string, string][]> = {
+  iq: [
+    ['sifre', 'ŞİFRELER · с. 5'],
+    ['numseq', 'SAYI DİZİLERİ · с. 29'],
+    ['numfig', 'SAYI BAĞINTILARI · с. 107'],
+    ['optable', 'TABLOLAR · с. 153'],
+    ['tablo', 'TABLOLAR: işlem tablosu · с. 153'],
+    ['balance', 'TERAZİLER · с. 185'],
+    ['esleme', 'EŞLEŞTİRME · с. 209'],
+    ['denklem_sekil', 'DENKLEM EŞLEŞTİRME · с. 221'],
+    ['cube_count', 'KÜPLER · с. 251'],
+    ['charts', 'GRAFİKLER · с. 261'],
+    ['perim_area', 'ÇEVRE VE ALAN · с. 277'],
+    ['klm', 'KLM · с. 287'],
+    ['fig_sum', 'ŞEKİL TAMAMLAMA · с. 311'],
+    ['fig_table', 'ŞEKİL TABLOLARI · с. 323'],
+    ['fig_series', 'ŞEKİL SIRALAMA · с. 353'],
+    ['fig_compare', 'FARKLI OLAN ŞEKLİ BULMA · с. 373'],
+    ['cube_net', '3 BOYUTLU CİSİMLER · с. 399'],
+    ['paper_fold', 'KAĞIT KESME-KATLAMA · с. 409'],
+    ['tri_count', 'ÜÇGEN SAYMA · с. 417'],
+    ['clock', 'SAAT · с. 427'],
+    ['magic', 'SUDOKU: sihirli kare · с. 433'],
+    ['sudoku', 'SUDOKU · с. 433'],
+    ['iq_problem', 'PROBLEMLER · с. 443'],
+    ['mantik', 'MANTIK PROBLEMLERİ · с. 455'],
+    ['discs', 'с. 457'],
+  ],
+  algebra: [
+    ['temel_kavram', 'Temel Kavramlar · с. 9'],
+    ['rational', 'Rasyonel Sayılar · с. 19'],
+    ['linear', 'I. Dereceden Denklemler · с. 33'],
+    ['exponent', 'Üslü İfadeler · с. 49'],
+    ['radical', 'Köklü İfadeler · с. 67'],
+    ['factor', 'Çarpanlara Ayırma · с. 91'],
+    ['system', 'Çarpanlara Ayırma · с. 104'],
+    ['inequality', 'Basit Eşitsizlik · с. 113'],
+    ['absolute', 'Mutlak Değer · с. 125'],
+    ['digits_num', 'Taban Aritmetiği · с. 141'],
+    ['taban', 'Taban Aritmetiği: sayı sistemleri · с. 141'],
+    ['series', 'Sayılar · с. 153'],
+    ['digits', 'Sayılar: bölünebilme · с. 153'],
+    ['sayilar', 'Sayılar: bölenler, faktöriyel · с. 153'],
+    ['oran', 'Oran-Orantı · с. 181'],
+    ['sets', 'Kümeler · с. 195'],
+    ['kartezyen', 'Kartezyen Çarpım · с. 221'],
+    ['fonksiyon', 'Fonksiyonlar · с. 229'],
+    ['operation', 'İşlem · с. 255'],
+    ['modular', 'Modüler Aritmetik · с. 269'],
+    ['percent', 'Problemler: yüzde · с. 283'],
+    ['problem_yas', 'Problemler: yaş · с. 289'],
+    ['problem_hareket', 'Problemler: hareket · с. 295'],
+    ['problem_isci', 'Problemler: işçi · с. 301'],
+    ['problem_havuz', 'Problemler: havuz · с. 305'],
+    ['problem_karisim', 'Problemler: karışım · с. 313'],
+    ['problem_faiz', 'Problemler: faiz · с. 319'],
+    ['problem_kar', 'Problemler: kâr-zarar · с. 325'],
+    ['viet', EXAM_SOURCE],
+    ['quadratic', EXAM_SOURCE],
+    ['sequence', EXAM_SOURCE],
+  ],
+  geometry: [
+    ['geo_kavram', 'Doğruda Açı · с. 5'],
+    ['tri_angles', 'Üçgende Açılar · с. 21'],
+    ['geo_height', 'Dik Üçgen · с. 47'],
+    ['ikizkenar', 'İkizkenar Üçgen · с. 69'],
+    ['equilateral', 'Eşkenar Üçgen · с. 85'],
+    ['geo_bisector', 'Açıortay · с. 101'],
+    ['kenarortay', 'Kenarortay · с. 117'],
+    ['geo_similar', 'Üçgende Benzerlik · с. 133'],
+    ['tri_area', 'Üçgende Alan · с. 161'],
+    ['merkezler', 'Üçgende Merkezler · с. 183'],
+    ['geo_incircle', 'Üçgende Merkezler · с. 183'],
+    ['aci_kenar', 'Açı-Kenar Bağıntısı · с. 193'],
+    ['polygon', 'Çokgenler · с. 211'],
+    ['geo_hexagon', 'Çokgenler · с. 211'],
+    ['dortgen', 'Dörtgenler · с. 233'],
+    ['parallelogram', 'Paralelkenar · с. 249'],
+    ['geo_rhombus', 'Eşkenar Dörtgen · с. 279'],
+    ['trapezoid', 'Yamuk · с. 291'],
+    ['deltoid', 'Deltoid · с. 313'],
+    ['square_rect', 'Dikdörtgen, Kare · с. 323'],
+    ['circle_angle', 'Çemberde Açı · с. 361'],
+    ['circle_len', 'Çemberde Uzunluk · с. 387'],
+    ['circle_area', 'Dairede Alan · с. 409'],
+    ['analytic', 'Analitik Geometri · с. 429'],
+    ['simetri', 'Simetri · с. 475'],
+    ['cember', 'Çemberin Analitiği · с. 487'],
+  ],
+};
+
+function buildCatalog(): Group[] {
+  const out: Group[] = [];
+  for (const section of ['iq', 'algebra', 'geometry'] as Section[]) {
+    const topics: Topic[] = [];
+    const seen = new Set<string>();
+    for (const [key, source] of ORDER[section]) {
+      const list = BY_TOPIC.get(key);
+      if (!list?.length) continue;
+      seen.add(key);
+      topics.push({ key, label: list[0].topicLabel || key, section, source, count: list.length });
+    }
+    // Тема, которой нет в списке выше, всё равно должна попасть в каталог.
+    for (const [key, list] of BY_TOPIC) {
+      if (seen.has(key) || list[0].section !== section) continue;
+      topics.push({ key, label: list[0].topicLabel || key, section, source: EXAM_SOURCE, count: list.length });
+    }
+    if (topics.length) {
+      out.push({ key: section, label: SECTION_LABEL[section], book: SECTION_BOOK[section], topics });
+    }
+  }
+  return out;
+}
+
+export const CATALOG: Group[] = buildCatalog();
+export const TOTAL_TOPICS = CATALOG.reduce((n, g) => n + g.topics.length, 0);
+
+const MIX = 'mix-';
+
+export function topicInfo(key: string): Topic | null {
+  if (key.startsWith(MIX)) {
+    const g = CATALOG.find((x) => x.key === key.slice(MIX.length));
+    if (!g) return null;
+    return {
+      key,
+      label: `${g.label}: все темы вперемешку`,
+      section: g.key,
+      source: g.book,
+      count: g.topics.reduce((n, t) => n + t.count, 0),
+      mixed: true,
+    };
+  }
+  for (const g of CATALOG) {
+    const t = g.topics.find((x) => x.key === key);
+    if (t) return t;
+  }
+  return null;
+}
+
+/* ------------------------------------------------------- вид для ученика */
+
+const decode = (s: string): string =>
+  s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&le;/g, '≤')
+    .replace(/&ge;/g, '≥')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
+
+/* Классы и id внутри чертежа получают префикс задачи: на одной странице
+   могут оказаться два SVG, и стили одного не должны менять другой. */
+function scopeFigure(svg: string | undefined, id: string): string | undefined {
+  if (!svg) return svg;
+  const p = `z${id.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}-`;
+  return svg
+    .replace(/\.f(\d+)\s*\{/g, (_m, n) => `.${p}f${n}{`)
+    .replace(/class='f(\d+)'/g, (_m, n) => `class='${p}f${n}'`)
+    .replace(/id='([^']+)'/g, (_m, v) => `id='${p}${v}'`)
+    .replace(/href='#([^']+)'/g, (_m, v) => `href='#${p}${v}'`)
+    .replace(/\{([^}]*font-[^}]*fill:#ffffff)\}/g, '{$1;stroke:none !important}')
+    .replace(/style='([^']*font-[^']*fill:#ffffff)'/g, "style='$1;stroke:none !important'");
+}
+
+export const toPublic = (q: Item): PublicQuestion => ({
+  id: q.id,
+  topic: q.topic,
+  topicLabel: q.topicLabel,
+  section: q.section,
+  text: q.text,
+  options: q.options.map(decode),
+  figure: scopeFigure(q.figure, q.id),
+});
+
+export function itemById(id: string): Item | undefined {
+  return BY_ID.get(id);
+}
+
+export function publicById(id: string): PublicQuestion | null {
+  const q = BY_ID.get(id);
+  return q ? toPublic(q) : null;
+}
+
+export function checkAnswer(id: string, chosen: number): (Verdict & { topic: string; topicLabel: string; section: Section }) | null {
+  const q = BY_ID.get(id);
+  if (!q) return null;
+  return {
+    correct: q.correct,
+    isCorrect: chosen === q.correct,
+    explanation: q.explanation,
+    topic: q.topic,
+    topicLabel: q.topicLabel,
+    section: q.section,
+  };
+}
+
+function shuffle<T>(list: T[]): T[] {
+  const a = list.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Задачи темы в случайном порядке; «mix-algebra» — по кругу из всех тем раздела. */
+export function topicQuestions(key: string, limit = 20): PublicQuestion[] {
+  const info = topicInfo(key);
+  if (!info) return [];
+  if (!info.mixed) return shuffle(BY_TOPIC.get(info.key) || []).slice(0, limit).map(toPublic);
+
+  const group = CATALOG.find((g) => g.key === info.section);
+  if (!group) return [];
+  const pools = shuffle(group.topics).map((t) => shuffle(BY_TOPIC.get(t.key) || []));
+  const out: Item[] = [];
+  for (let round = 0; out.length < limit && round < 60; round++) {
+    for (const pool of pools) {
+      if (out.length >= limit) break;
+      if (pool[round]) out.push(pool[round]);
+    }
+  }
+  return out.map(toPublic);
+}
+
+/* --------------------------------------------------------------- пробник */
+
+const isIq = (q: Item) => q.section === 'iq';
+
+/** Набрать n задач, равномерно размазав их по темам. */
+function spread(pool: Item[], n: number): Item[] {
+  if (n <= 0) return [];
+  const byTopic = new Map<string, Item[]>();
+  for (const q of pool) {
+    const l = byTopic.get(q.topic) || [];
+    l.push(q);
+    byTopic.set(q.topic, l);
+  }
+  const lists = shuffle([...byTopic.values()].map((l) => shuffle(l)));
+  const out: Item[] = [];
+  for (let round = 0; out.length < n && round < 200; round++) {
+    for (const l of lists) {
+      if (out.length >= n) break;
+      if (l[round]) out.push(l[round]);
+    }
+  }
+  return out;
+}
+
+/** Вариант пробника: сначала все задачи логики, потом вся математика. */
+export function buildExam(spec: FormatSpec): Item[] {
+  const iq = spread(EXAM.filter(isIq), spec.iq);
+  const math = spread(EXAM.filter((q) => !isIq(q)), spec.math);
+  return [...shuffle(iq), ...shuffle(math)];
+}
+
+/* ------------------------------------------------- подсчёт балла 0–500 */
+
+const SCORING = {
+  base: 100,
+  min: 0,
+  max: 500,
+  wrongPenalty: 0.25,
+  iqMax: 40 * 4.5,     // 180
+  mathMax: 40 * 5.5,   // 220
+};
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+function part(total: number, correct: number, wrong: number, blank: number, maxScore: number): PartResult {
+  const net = Math.max(0, correct - wrong * SCORING.wrongPenalty);
+  const accuracy = total > 0 ? clamp(net / total, 0, 1) : 0;
+  return {
+    total, correct, wrong, blank, net,
+    accuracyPct: Math.round(accuracy * 1000) / 10,
+    score: accuracy * maxScore,
+    maxScore,
+  };
+}
+
+/**
+ * Балл считается ровно по той же формуле, что и быстрый тест на сайте
+ * и в телеграм-боте: 100 + точность логики · 180 + точность математики · 220,
+ * каждая ошибка съедает четверть верного ответа. Пробник из одного раздела
+ * растягивает свой вес на всю шкалу, поэтому баллы сравнимы между форматами.
+ */
+export function gradeExam(ids: string[], answers: (number | null)[]): ExamResult {
+  const rows = ids.map((id, i) => {
+    const q = BY_ID.get(id);
+    const chosen = answers[i] ?? null;
+    return {
+      q,
+      chosen,
+      ok: q && chosen !== null ? chosen === q.correct : null,
+    };
+  }).filter((r) => r.q) as { q: Item; chosen: number | null; ok: boolean | null }[];
+
+  const bucket = (want: boolean) => {
+    const items = rows.filter((r) => isIq(r.q) === want);
+    return {
+      total: items.length,
+      correct: items.filter((r) => r.ok === true).length,
+      wrong: items.filter((r) => r.ok === false).length,
+      blank: items.filter((r) => r.ok === null).length,
+    };
+  };
+
+  const bi = bucket(true);
+  const bm = bucket(false);
+  const iq = part(bi.total, bi.correct, bi.wrong, bi.blank, SCORING.iqMax);
+  const math = part(bm.total, bm.correct, bm.wrong, bm.blank, SCORING.mathMax);
+
+  const both = SCORING.iqMax + SCORING.mathMax;
+  if (iq.total === 0 && math.total > 0) {
+    math.score = (math.accuracyPct / 100) * both;
+    math.maxScore = both;
+  } else if (math.total === 0 && iq.total > 0) {
+    iq.score = (iq.accuracyPct / 100) * both;
+    iq.maxScore = both;
+  }
+
+  const score = Math.round(clamp(SCORING.base + iq.score + math.score, SCORING.min, SCORING.max));
+
+  const byTopic = new Map<string, { topic: string; label: string; total: number; correct: number }>();
+  for (const r of rows) {
+    const e = byTopic.get(r.q.topic) || { topic: r.q.topic, label: r.q.topicLabel || r.q.topic, total: 0, correct: 0 };
+    e.total += 1;
+    if (r.ok === true) e.correct += 1;
+    byTopic.set(r.q.topic, e);
+  }
+  const stats = [...byTopic.values()];
+  const acc = (e: { total: number; correct: number }) => (e.total ? e.correct / e.total : 0);
+
+  return {
+    total: rows.length,
+    answered: rows.filter((r) => r.chosen !== null).length,
+    iq,
+    math,
+    score,
+    weak: stats.filter((e) => acc(e) < 0.6).sort((a, b) => acc(a) - acc(b) || b.total - a.total).slice(0, 5),
+    strong: stats.filter((e) => acc(e) >= 0.8 && e.total >= 2).sort((a, b) => acc(b) - acc(a)).slice(0, 3),
+  };
+}
+
+/* ------------------------------------------------------ режим выживания */
+
+/** Чем длиннее серия, тем реже попадаются короткие темы и тем чаще — тяжёлые. */
+export function survivalPick(streak: number, exclude: Set<string>): Item | null {
+  const pool = PRACTICE.filter((q) => !exclude.has(q.id));
+  if (!pool.length) return null;
+  // До 5 верных подряд — любая тема; дальше упор на геометрию и математику,
+  // где задачи в банке длиннее и считаются дольше.
+  const hard = streak >= 5 ? pool.filter((q) => q.section !== 'iq') : pool;
+  const from = hard.length > 40 ? hard : pool;
+  return from[Math.floor(Math.random() * from.length)];
+}
+
+export { FORMATS, SECTION_LABEL, SECTION_BOOK, formatByKey };
+export type { ExamFormat, ExamResult, FormatSpec, Group, PublicQuestion, Section, Topic, Verdict };
