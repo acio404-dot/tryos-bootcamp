@@ -17,7 +17,7 @@ export default async function Admin() {
          to_char(u.last_seen, 'YYYY-MM-DD') as last_seen
        from bc_students s left join bc_users u on u.id = s.user_id
        order by s.created_at desc`,
-    db`select id, course, name, teacher, schedule, to_char(starts, 'YYYY-MM-DD') as starts, to_char(ends, 'YYYY-MM-DD') as ends,
+    db`select id, kind, course, name, teacher, schedule, to_char(starts, 'YYYY-MM-DD') as starts, to_char(ends, 'YYYY-MM-DD') as ends,
          total_lessons, link, chat, materials, color from bc_groups order by course, name`,
     db`select student_id, group_id from bc_members`,
     db`select id, student_id, title, value::float as value, max::float as max, teacher, to_char(date, 'YYYY-MM-DD') as date
@@ -32,7 +32,8 @@ export default async function Admin() {
       <div className="top">
         <div>
           <h1>Админка</h1>
-          <p>Ученики и их ID, группы, расписание, доступ и баллы. Зарегистрировано аккаунтов: {users[0]?.n ?? 0}.</p>
+          <p>Ученики и их ID, группы, индивидуальные занятия, расписание, доступ и баллы.
+            Зарегистрировано аккаунтов: {users[0]?.n ?? 0}.</p>
         </div>
       </div>
       <AdminPanel
