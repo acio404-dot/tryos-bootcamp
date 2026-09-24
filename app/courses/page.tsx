@@ -18,12 +18,12 @@ export default async function Courses() {
 
   return (
     <Shell user={user} student={student} active="courses">
-      <div className="top"><div><h1>Мои курсы</h1><p>Курсы и группы добавляет школа по твоему ID ученика.</p></div></div>
+      <div className="top"><div><h1>Мои курсы</h1><p>Курсы, группы и индивидуальные занятия добавляет школа по твоему ID ученика.</p></div></div>
 
       {!student ? (
         <div className="card empty-card">
           <h2>Привяжи ID ученика</h2>
-          <p>ID выдаёт школа после записи на курс. С ним здесь появятся твои курсы, группа, преподаватели и материалы.</p>
+          <p>ID выдаёт школа после записи на курс. С ним здесь появятся твои занятия, преподаватели и материалы.</p>
           <div style={{ maxWidth: 420, margin: '0 auto' }}><LinkIdForm /></div>
         </div>
       ) : !can(access, 'courses') ? (
@@ -34,7 +34,7 @@ export default async function Courses() {
       ) : !groups.length ? (
         <div className="card empty-card">
           <h2>Курсов пока нет</h2>
-          <p>Школа ещё не добавила тебя в группу. Как только добавит — курс появится здесь.</p>
+          <p>Школа ещё не добавила тебя на курс — в группу или на индивидуальные занятия. Как только добавит, он появится здесь.</p>
         </div>
       ) : (
         <div className="grid g-2e">
@@ -46,7 +46,11 @@ export default async function Courses() {
               <div className="card course" key={g.id}>
                 <div className="course-head">
                   <div>
-                    <span className="kicker"><span className="c-dot" style={{ background: color }} />{g.ends && g.ends < new Date().toISOString().slice(0, 10) ? 'Завершён' : 'Идёт'}</span>
+                    <span className="kicker">
+                      <span className="c-dot" style={{ background: color }} />
+                      {g.ends && g.ends < new Date().toISOString().slice(0, 10) ? 'Завершён' : 'Идёт'}
+                      {g.kind === 'solo' ? ' · индивидуально' : ''}
+                    </span>
                     <h3>{g.course}</h3>
                   </div>
                   {g.name ? <span className="chip" style={{ color, background: `${color}1f` }}>{g.name}</span> : null}
@@ -66,7 +70,11 @@ export default async function Courses() {
                 <div className="row">
                   {g.link ? <a className="btn btn-dark" href={g.link} target="_blank" rel="noopener noreferrer">Ссылка на занятие</a> : null}
                   {can(access, 'materials') && g.materials ? <a className="btn btn-ghost" href={g.materials} target="_blank" rel="noopener noreferrer">Материалы</a> : null}
-                  {can(access, 'materials') && g.chat ? <a className="btn btn-ghost" href={g.chat} target="_blank" rel="noopener noreferrer">Чат группы</a> : null}
+                  {can(access, 'materials') && g.chat ? (
+                    <a className="btn btn-ghost" href={g.chat} target="_blank" rel="noopener noreferrer">
+                      {g.kind === 'solo' ? 'Чат с преподавателем' : 'Чат группы'}
+                    </a>
+                  ) : null}
                 </div>
               </div>
             );
