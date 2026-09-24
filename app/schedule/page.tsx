@@ -13,13 +13,6 @@ export const metadata = { title: 'Расписание' };
 const COLORS = ['#1E8F8A', '#2C7FB0', '#7A5AC8', '#C9791C', '#1F9D6B'];
 const KIND: Record<string, string> = { deadline: 'Сдать', lesson: 'Доп. занятие', exam: 'Экзамен' };
 
-/** Время события в часовом поясе школы: 'HH:MM' и дата. */
-function local(iso: string) {
-  const f = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
-  const p = Object.fromEntries(f.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
-  return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour === '24' ? '00' : p.hour}:${p.minute}` };
-}
-
 export default async function Schedule({ searchParams }: { searchParams: { w?: string } }) {
   const user = await requireUser();
   const student = await studentOfUser(user.id);
@@ -39,7 +32,29 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
   const events = allowed
     ? await eventsOf(student!.id, groups.map((g) => g.id), `${addDays(monday, -1)}T00:00:00Z`, `${addDays(sunday, 2)}T00:00:00Z`)
     : [];
-  const upcoming = upcomingLessons(groups, 14, 8);
+  // «Ближайшие» — и занятия по расписанию, и назначенные отдельно
+  // (доп. занятия, тестирования), в одном списке по времени.
+  const soon = allowed
+    ? await eventsOf(student!.id, groups.map((g) => g.id), new Date().toISOString(), new Date(Date.now() + 14 * 86_400_000).toISOString())
+    : [];
+  const upcoming = [
+    ...upcomingLessons(groups, 14, 8).map((l) => ({
+      key: `l-${l.date}-${l.group.id}-${l.start}`,
+      date: l.date,
+      time: l.start,
+      title: `${l.group.course}${l.group.name ? ` · ${l.group.name}` : ''}`,
+      sub: `${whenRu(now.date, l.date)}, ${l.start}–${l.end}${l.group.kind === 'solo' ? ' · индивидуально' : ''}${l.group.teacher ? ` · ${l.group.teacher}` : ''}`,
+      link: l.group.link,
+    })),
+    ...soon.filter((e) => e.kind !== 'deadline').map((e) => ({
+      key: `e-${e.id}`,
+      date: e.day,
+      time: e.time,
+      title: e.title,
+      sub: `${whenRu(now.date, e.day)}, ${e.time} · ${e.kind === 'exam' ? 'тестирование' : 'доп. занятие'}${e.note ? ` · ${e.note}` : ''}`,
+      link: e.link,
+    })),
+  ].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).slice(0, 8);
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(monday, i);
@@ -63,14 +78,15 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
       }
     }
     for (const e of events) {
-      const l = local(e.at);
-      if (l.date !== date) continue;
+      if (e.day !== date) continue;
       items.push({
         key: `e${e.id}`,
-        time: l.time,
+        time: e.time,
         html: (
           <div className={`ev ${e.kind === 'deadline' ? 'dl' : 'tk'}`}>
-            <b>{KIND[e.kind] || 'Событие'}{e.kind !== 'deadline' ? ` · ${l.time}` : ''}</b>{e.title}
+            <b>{KIND[e.kind] || 'Событие'}{e.kind !== 'deadline' ? ` · ${e.time}` : ''}</b>{e.title}
+            {e.note ? <i>{e.note}</i> : null}
+            {e.link ? <a href={e.link} target="_blank" rel="noopener noreferrer">Ссылка →</a> : null}
           </div>
         ),
       });
@@ -123,17 +139,10 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
             {upcoming.length ? (
               <ul className="list">
                 {upcoming.map((l) => (
-                  <li key={`${l.date}-${l.group.id}-${l.start}`}>
+                  <li key={l.key}>
                     <span className="date-box"><b>{dateShort(l.date).day}</b><span>{dateShort(l.date).mon}</span></span>
-                    <span className="txt">
-                      <b>{l.group.course}{l.group.name ? ` · ${l.group.name}` : ''}</b>
-                      <i>
-                        {whenRu(now.date, l.date)}, {l.start}–{l.end}
-                        {l.group.kind === 'solo' ? ' · индивидуально' : ''}
-                        {l.group.teacher ? ` · ${l.group.teacher}` : ''}
-                      </i>
-                    </span>
-                    {l.group.link ? <a className="go" href={l.group.link} target="_blank" rel="noopener noreferrer">Ссылка →</a> : null}
+                    <span className="txt"><b>{l.title}</b><i>{l.sub}</i></span>
+                    {l.link ? <a className="go" href={l.link} target="_blank" rel="noopener noreferrer">Ссылка →</a> : null}
                   </li>
                 ))}
               </ul>
