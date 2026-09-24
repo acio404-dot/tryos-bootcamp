@@ -12,11 +12,12 @@
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import {
-  addEvent, addScore, createStudent, deleteEvent, deleteGroup, deleteScore, deleteStudent,
-  saveGroup, unbindStudent, updateStudent, type AdminResult, type GroupInput, type StudentInput,
+  addEvent, addEvents, addScore, createStudent, deleteEvent, deleteEventBatch, deleteGroup, deleteScore,
+  deleteStudent, saveGroup, unbindStudent, updateStudent,
+  type AdminResult, type EventInput, type GroupInput, type StudentInput,
 } from '@/lib/admin-actions';
 import { SECTIONS, type Access, type Section } from '@/lib/access';
-import { DOW, dateShort } from '@/lib/format';
+import { DOW, dateShort, plural } from '@/lib/format';
 
 /** '2027-04-11' → '11 апр 2027' (год — только если не текущий). */
 function short(iso: string | null | undefined): string {
@@ -64,7 +65,18 @@ export interface AGroup {
 }
 export interface AMember { student_id: string; group_id: number }
 export interface AScore { id: number; student_id: string; title: string; value: number; max: number; teacher: string | null; date: string }
-export interface AEvent { id: number; group_id: number | null; student_id: string | null; kind: string; title: string; at: string }
+export interface AEvent {
+  id: number;
+  group_id: number | null;
+  student_id: string | null;
+  kind: string;
+  title: string;
+  at: string;
+  scope?: string | null;
+  batch?: string | null;
+  link?: string | null;
+  note?: string | null;
+}
 
 const COLORS = ['#1E8F8A', '#2C7FB0', '#7A5AC8', '#C9791C', '#1F9D6B'];
 const KIND_RU: Record<string, string> = { deadline: 'Срок', lesson: 'Доп. занятие', exam: 'Пробный экзамен' };
@@ -165,9 +177,10 @@ export default function AdminPanel({
   scores: AScore[];
   events: AEvent[];
 }) {
-  const [tab, setTab] = useState<'students' | 'group' | 'solo'>('students');
+  const [tab, setTab] = useState<'students' | 'group' | 'solo' | 'events'>('students');
   const inGroups = groups.filter((g) => !isSolo(g));
   const solos = groups.filter(isSolo);
+  const planned = events.filter((e) => e.batch).length;
 
   return (
     <>
@@ -181,10 +194,17 @@ export default function AdminPanel({
         <button type="button" role="tab" aria-selected={tab === 'solo'} className={tab === 'solo' ? 'on' : ''} onClick={() => setTab('solo')}>
           Индивидуально · {solos.length}
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'events'} className={tab === 'events' ? 'on' : ''} onClick={() => setTab('events')}>
+          Занятия и тесты{planned ? ` · ${planned}` : ''}
+        </button>
       </div>
-      {tab === 'students'
-        ? <StudentsTab students={students} groups={groups} members={members} scores={scores} events={events} />
-        : <CoursesTab kind={tab} students={students} groups={tab === 'solo' ? solos : inGroups} members={members} events={events} />}
+      {tab === 'students' ? (
+        <StudentsTab students={students} groups={groups} members={members} scores={scores} events={events} />
+      ) : tab === 'events' ? (
+        <EventsTab students={students} groups={groups} members={members} events={events} />
+      ) : (
+        <CoursesTab kind={tab} students={students} groups={tab === 'solo' ? solos : inGroups} members={members} events={events} />
+      )}
     </>
   );
 }
@@ -585,7 +605,10 @@ function EventsBlock({ groupId, studentId, events }: { groupId?: number; student
         <ul className="mini-list" style={{ marginTop: 0 }}>
           {events.map((ev) => (
             <li key={ev.id}>
-              <span><span className={`pill ${ev.kind === 'exam' ? 'warn' : ''}`}>{KIND_RU[ev.kind] || ev.kind}</span> <b>{ev.title}</b></span>
+              <span>
+                <span className={`pill ${ev.kind === 'exam' ? 'warn' : ''}`}>{KIND_RU[ev.kind] || ev.kind}</span> <b>{ev.title}</b>
+                {ev.batch ? <span className="muted" style={{ fontSize: 12.5 }}> · из общего назначения</span> : null}
+              </span>
               <span className="row" style={{ alignItems: 'center', gap: 10, flexWrap: 'nowrap' }}>
                 <span className="nw muted">{short(ev.at)}, {ev.at.slice(11, 16)}</span>
                 <button
@@ -613,7 +636,9 @@ function EventsBlock({ groupId, studentId, events }: { groupId?: number; student
         </div>
         <div className="fields-2">
           <Field label="Дата"><input className="input" type="date" value={v.date} onChange={set('date')} /></Field>
-          <Field label="Время" hint="Пусто — до 23:59"><input className="input" type="time" value={v.time} onChange={set('time')} /></Field>
+          <Field label="Время" hint={v.kind === 'deadline' ? 'Пусто — до 23:59' : 'Пусто — 10:00'}>
+            <input className="input" type="time" value={v.time} onChange={set('time')} />
+          </Field>
         </div>
         <div className="row" style={{ alignItems: 'center' }}>
           <button className="btn btn-ghost btn-sm" disabled={act.pending}>{act.pending ? 'Добавляю…' : '+ Добавить'}</button>
@@ -621,6 +646,233 @@ function EventsBlock({ groupId, studentId, events }: { groupId?: number; student
         </div>
       </form>
     </>
+  );
+}
+
+/* ================================ занятия и тесты для всех и выборочно */
+
+const AUDIENCE = [
+  { key: 'all', label: 'Всем ученикам' },
+  { key: 'groups', label: 'Группам' },
+  { key: 'students', label: 'Отдельным ученикам' },
+] as const;
+type Audience = (typeof AUDIENCE)[number]['key'];
+
+/** Одно назначение: строки события, созданные разом (общий batch). */
+interface Plan { key: string; batch: string | null; head: AEvent; rows: AEvent[] }
+
+function planList(events: AEvent[]): Plan[] {
+  const out: Plan[] = [];
+  const byBatch = new Map<string, Plan>();
+  for (const e of events) {
+    if (!e.batch) continue; // одиночные из карточек группы и ученика живут там же
+    const found = byBatch.get(e.batch);
+    if (found) { found.rows.push(e); continue; }
+    const plan: Plan = { key: e.batch, batch: e.batch, head: e, rows: [e] };
+    byBatch.set(e.batch, plan);
+    out.push(plan);
+  }
+  return out;
+}
+
+function EventsTab({
+  students, groups, members, events,
+}: {
+  students: AStudent[]; groups: AGroup[]; members: AMember[]; events: AEvent[];
+}) {
+  const act = useAction();
+  const today = new Date().toISOString().slice(0, 10);
+  const [v, setV] = useState({ kind: 'lesson', title: '', date: '', time: '', link: '', note: '' });
+  const [audience, setAudience] = useState<Audience>('all');
+  const [pickedGroups, setPickedGroups] = useState<number[]>([]);
+  const [pickedStudents, setPickedStudents] = useState<string[]>([]);
+  const [q, setQ] = useState('');
+  const [okMsg, setOkMsg] = useState('');
+
+  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setOkMsg('');
+    setV({ ...v, [k]: e.target.value });
+  };
+
+  const found = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return students;
+    return students.filter((st) => [st.name, st.id, st.phone].some((x) => x && x.toLowerCase().includes(s)));
+  }, [students, q]);
+
+  // сколько учеников затронет назначение — видно до отправки
+  const reach = useMemo(() => {
+    if (audience === 'all') return students.length;
+    if (audience === 'students') return pickedStudents.length;
+    const ids = new Set(members.filter((m) => pickedGroups.includes(m.group_id)).map((m) => m.student_id));
+    return ids.size;
+  }, [audience, students, members, pickedGroups, pickedStudents]);
+
+  const plans = useMemo(() => planList(events), [events]);
+  const nameOfGroup = (id: number) => { const g = groups.find((x) => x.id === id); return g ? groupTitle(g) : `группа ${id}`; };
+  const nameOfStudent = (id: string) => students.find((x) => x.id === id)?.name || id;
+
+  const audienceText = (p: Plan) => {
+    if (p.head.scope === 'all') return 'Все ученики';
+    const names = p.rows[0].group_id != null
+      ? p.rows.map((r) => nameOfGroup(r.group_id as number))
+      : p.rows.map((r) => nameOfStudent(r.student_id as string));
+    return names.length > 3 ? `${names.slice(0, 3).join(', ')} и ещё ${names.length - 3}` : names.join(', ');
+  };
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setOkMsg('');
+    const input: EventInput = {
+      ...v, audience,
+      groups: audience === 'groups' ? pickedGroups : undefined,
+      students: audience === 'students' ? pickedStudents : undefined,
+    };
+    act.run(() => addEvents(input), () => {
+      setOkMsg(`Назначено${reach ? ` · ${reach} ${plural(reach, 'ученик', 'ученика', 'учеников')}` : ''}`);
+      setV({ ...v, title: '', date: '', time: '', link: '', note: '' });
+      setPickedGroups([]);
+      setPickedStudents([]);
+    });
+  };
+
+  const toggle = <T,>(list: T[], x: T) => (list.includes(x) ? list.filter((y) => y !== x) : [...list, x]);
+
+  return (
+    <div className="grid" style={{ gap: 16 }}>
+      <div className="card">
+        <div className="card-head">
+          <h2>Новое занятие или тест</h2>
+          <span className="note" style={{ margin: 0 }}>появится в расписании ученика</span>
+        </div>
+
+        <form className="form" onSubmit={submit}>
+          <div className="fields-2">
+            <Field label="Что это">
+              <select className="select" value={v.kind} onChange={set('kind')}>
+                <option value="lesson">Дополнительное занятие</option>
+                <option value="exam">Тестирование / пробный экзамен</option>
+                <option value="deadline">Срок сдачи</option>
+              </select>
+            </Field>
+            <Field label="Название">
+              <input className="input" required value={v.title} onChange={set('title')} placeholder={v.kind === 'exam' ? 'Пробный экзамен №4' : 'Разбор геометрии'} />
+            </Field>
+          </div>
+
+          <div className="fields-3">
+            <Field label="Дата"><input className="input" type="date" required value={v.date} min={today} onChange={set('date')} /></Field>
+            <Field label="Время" hint={v.kind === 'deadline' ? 'Пусто — до 23:59' : 'Пусто — 10:00'}>
+              <input className="input" type="time" value={v.time} onChange={set('time')} />
+            </Field>
+            <Field label="Где" hint="Кабинет, «онлайн» — необязательно">
+              <input className="input" value={v.note} onChange={set('note')} placeholder="Онлайн" />
+            </Field>
+          </div>
+
+          <Field label="Ссылка" hint="Zoom, Meet или ссылка на тест — ученик увидит её в расписании">
+            <input className="input" value={v.link} onChange={set('link')} placeholder="https://meet.google.com/…" />
+          </Field>
+
+          <div className="field">
+            <span className="field-label">Кому</span>
+            <div className="seg">
+              {AUDIENCE.map((a) => (
+                <button key={a.key} type="button" className={audience === a.key ? 'on' : ''} onClick={() => { setOkMsg(''); setAudience(a.key); }}>
+                  {a.label}
+                </button>
+              ))}
+            </div>
+
+            {audience === 'groups' ? (
+              groups.length ? (
+                <div className="checks" style={{ marginTop: 10 }}>
+                  {groups.map((g, i) => (
+                    <label key={g.id} className="check">
+                      <input type="checkbox" checked={pickedGroups.includes(g.id)} onChange={() => { setOkMsg(''); setPickedGroups(toggle(pickedGroups, g.id)); }} />
+                      <span className="c-dot" style={{ background: colorOf(g, i) }} />
+                      {groupTitle(g)}{isSolo(g) ? ' · инд.' : ''}
+                    </label>
+                  ))}
+                </div>
+              ) : <small>Групп пока нет.</small>
+            ) : null}
+
+            {audience === 'students' ? (
+              <div style={{ marginTop: 10 }}>
+                <input className="input" type="search" placeholder="Поиск ученика" value={q} onChange={(e) => setQ(e.target.value)} />
+                <div className="checks pick-list">
+                  {found.map((st) => (
+                    <label key={st.id} className="check">
+                      <input type="checkbox" checked={pickedStudents.includes(st.id)} onChange={() => { setOkMsg(''); setPickedStudents(toggle(pickedStudents, st.id)); }} />
+                      {st.name}
+                    </label>
+                  ))}
+                  {!found.length ? <small>Никого не нашлось.</small> : null}
+                </div>
+              </div>
+            ) : null}
+
+            <small>
+              {audience === 'all'
+                ? `Увидят все ученики с привязанным ID — сейчас их ${students.length}.`
+                : `Выбрано учеников: ${reach}.`}
+            </small>
+          </div>
+
+          <div className="row" style={{ alignItems: 'center' }}>
+            <button className="btn btn-dark" disabled={act.pending}>{act.pending ? 'Назначаю…' : 'Назначить'}</button>
+            {okMsg ? <p className="okmsg">{okMsg}</p> : null}
+            {act.error ? <p className="err">{act.error}</p> : null}
+          </div>
+        </form>
+      </div>
+
+      <div className="card">
+        <div className="card-head">
+          <h2>Назначенные занятия и тесты</h2>
+          <span className="note" style={{ margin: 0 }}>за последний месяц и вперёд</span>
+        </div>
+        {plans.length ? (
+          <div className="a-list" style={{ marginTop: 14 }}>
+            {plans.map((p) => (
+              <PlanRow key={p.key} plan={p} who={audienceText(p)} />
+            ))}
+          </div>
+        ) : (
+          <p className="muted" style={{ margin: '16px 0 0' }}>
+            Пока ничего не назначено. Сроки из карточек групп и учеников показываются там же, в их карточках.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PlanRow({ plan, who }: { plan: Plan; who: string }) {
+  const act = useAction();
+  const e = plan.head;
+  const past = e.at.slice(0, 10) < new Date().toLocaleDateString('en-CA');
+  return (
+    <div className="a-row">
+      <div className="a-row-head">
+        <div className="grow">
+          <b>{e.title}</b>
+          <i>
+            {short(e.at)}, {e.at.slice(11, 16)} · {who}
+            {e.note ? ` · ${e.note}` : ''}
+          </i>
+        </div>
+        <span className={`pill ${e.kind === 'exam' ? 'warn' : ''}`}>{KIND_RU[e.kind] || e.kind}</span>
+        {past ? <span className="pill">прошло</span> : null}
+        {e.link ? <a className="btn btn-ghost btn-sm" href={e.link} target="_blank" rel="noopener noreferrer">Ссылка</a> : null}
+        <button
+          type="button" className="linklike danger" disabled={act.pending}
+          onClick={() => { if (confirm(`Удалить «${e.title}» у всех, кому назначено?`)) act.run(() => deleteEventBatch(plan.batch || '')); }}
+        >Удалить</button>
+      </div>
+      {act.error ? <p className="err" style={{ margin: '0 0 10px' }}>{act.error}</p> : null}
+    </div>
   );
 }
 
