@@ -69,6 +69,10 @@ function ensureSchema(): Promise<void> {
         color text,
         created_at timestamptz not null default now()
       )`;
+      // kind: 'group' — обычная группа, 'solo' — индивидуальные занятия с одним
+      // учеником. Колонка добавляется отдельно, чтобы уже созданная таблица
+      // на рабочей базе тоже её получила.
+      await q`alter table bc_groups add column if not exists kind text not null default 'group'`;
       await q`create table if not exists bc_members (
         student_id text not null,
         group_id int not null,

@@ -54,8 +54,12 @@ export function examOf(user: User, st: Student | null): Exam | null {
 
 export interface Slot { dow: number; start: string; end: string }
 
+/** 'group' — занятия в группе, 'solo' — индивидуальные с одним учеником. */
+export type GroupKind = 'group' | 'solo';
+
 export interface Group {
   id: number;
+  kind: GroupKind;
   course: string;
   name: string;
   teacher: string | null;
@@ -70,7 +74,7 @@ export interface Group {
 }
 
 export async function groupsOfStudent(studentId: string): Promise<Group[]> {
-  return db<Group>`select g.id, g.course, g.name, g.teacher, g.schedule, to_char(g.starts, 'YYYY-MM-DD') as starts,
+  return db<Group>`select g.id, g.kind, g.course, g.name, g.teacher, g.schedule, to_char(g.starts, 'YYYY-MM-DD') as starts,
     to_char(g.ends, 'YYYY-MM-DD') as ends, g.total_lessons, g.link, g.chat, g.materials, g.color
     from bc_groups g join bc_members m on m.group_id = g.id
     where m.student_id = ${studentId} order by g.course`;

@@ -45,9 +45,14 @@ export interface StudentInput {
   groups?: number[];
 }
 
+/**
+ * Переписывает список групп ученика. Индивидуальные занятия (kind = 'solo')
+ * не трогаем: у них ученик задаётся в карточке самого занятия.
+ */
 async function setGroups(studentId: string, groups: number[] | undefined) {
   if (!groups) return;
-  await db`delete from bc_members where student_id = ${studentId}`;
+  await db`delete from bc_members m using bc_groups g
+    where m.group_id = g.id and m.student_id = ${studentId} and g.kind <> 'solo'`;
   for (const g of groups) {
     const id = intOrNull(g);
     if (id) await db`insert into bc_members (student_id, group_id) values (${studentId}, ${id}) on conflict do nothing`;
@@ -95,6 +100,14 @@ export async function unbindStudent(id: string): Promise<AdminResult> {
 export async function deleteStudent(id: string): Promise<AdminResult> {
   const err = await guard();
   if (err) return { error: err };
+  // Индивидуальные занятия существуют только ради одного ученика — уходят вместе с ним.
+  const solo = await db<{ id: number }>`select g.id from bc_groups g join bc_members m on m.group_id = g.id
+    where m.student_id = ${id} and g.kind = 'solo'`;
+  for (const g of solo) {
+    await db`delete from bc_members where group_id = ${g.id}`;
+    await db`delete from bc_events where group_id = ${g.id}`;
+    await db`delete from bc_groups where id = ${g.id}`;
+  }
   await db`delete from bc_members where student_id = ${id}`;
   await db`delete from bc_scores where student_id = ${id}`;
   await db`delete from bc_events where student_id = ${id}`;
@@ -130,6 +143,10 @@ export async function deleteScore(id: number): Promise<AdminResult> {
 /* -------------------------------------------------------------- группы */
 
 export interface GroupInput {
+  /** 'group' — набор учеников, 'solo' — индивидуальные занятия с одним. */
+  kind?: string;
+  /** Только для 'solo': ID ученика, с которым идут занятия. */
+  studentId?: string | null;
   course: string;
   name?: string;
   teacher?: string;
@@ -167,6 +184,12 @@ export async function saveGroup(id: number | null, input: GroupInput): Promise<A
   if (err) return { error: err };
   const course = clean(input.course, 80);
   if (!course) return { error: 'Укажи название курса' };
+  const kind = input.kind === 'solo' ? 'solo' : 'group';
+  const studentId = kind === 'solo' ? clean(input.studentId, 40) : null;
+  if (kind === 'solo') {
+    if (!studentId) return { error: 'Выбери ученика для индивидуальных занятий' };
+    if (!(await one`select 1 from bc_students where id = ${studentId}`)) return { error: 'Такого ученика нет' };
+  }
   const slots = slotsOf(input.schedule);
   if (typeof slots === 'string') return { error: slots };
   const vals = {
@@ -181,14 +204,21 @@ export async function saveGroup(id: number | null, input: GroupInput): Promise<A
     materials: url(input.materials),
     color: clean(input.color, 20),
   };
-  if (id) {
-    await db`update bc_groups set course = ${course}, name = ${vals.name}, teacher = ${vals.teacher}, schedule = ${vals.schedule}::jsonb,
+  let gid = id;
+  if (gid) {
+    await db`update bc_groups set kind = ${kind}, course = ${course}, name = ${vals.name}, teacher = ${vals.teacher}, schedule = ${vals.schedule}::jsonb,
       starts = ${vals.starts}, ends = ${vals.ends}, total_lessons = ${vals.total}, link = ${vals.link}, chat = ${vals.chat},
-      materials = ${vals.materials}, color = ${vals.color} where id = ${id}`;
+      materials = ${vals.materials}, color = ${vals.color} where id = ${gid}`;
   } else {
-    await db`insert into bc_groups (course, name, teacher, schedule, starts, ends, total_lessons, link, chat, materials, color)
-      values (${course}, ${vals.name}, ${vals.teacher}, ${vals.schedule}::jsonb, ${vals.starts}, ${vals.ends}, ${vals.total},
-        ${vals.link}, ${vals.chat}, ${vals.materials}, ${vals.color})`;
+    const row = await one<{ id: number }>`insert into bc_groups (kind, course, name, teacher, schedule, starts, ends, total_lessons, link, chat, materials, color)
+      values (${kind}, ${course}, ${vals.name}, ${vals.teacher}, ${vals.schedule}::jsonb, ${vals.starts}, ${vals.ends}, ${vals.total},
+        ${vals.link}, ${vals.chat}, ${vals.materials}, ${vals.color}) returning id`;
+    gid = row?.id ?? null;
+  }
+  // У индивидуальных занятий участник ровно один — переписываем состав целиком.
+  if (kind === 'solo' && gid && studentId) {
+    await db`delete from bc_members where group_id = ${gid} and student_id <> ${studentId}`;
+    await db`insert into bc_members (student_id, group_id) values (${studentId}, ${gid}) on conflict do nothing`;
   }
   revalidatePath('/', 'layout');
   return { ok: true };
