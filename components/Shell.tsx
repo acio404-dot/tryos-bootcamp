@@ -2,9 +2,9 @@ import Link from 'next/link';
 import { isAdmin, type User } from '@/lib/auth';
 import type { Student } from '@/lib/data';
 import { initials } from '@/lib/format';
-import { IBook, ICal, IChart, ICheck, IGear, IHome, IPlay, IShield } from './icons';
+import { IBook, ICal, IChart, ICheck, IFlame, IGear, IHome, IPlay, IShield, ITarget } from './icons';
 
-export type Tab = 'home' | 'courses' | 'schedule' | 'progress' | 'settings' | 'admin';
+export type Tab = 'home' | 'exam' | 'trainer' | 'survival' | 'courses' | 'schedule' | 'progress' | 'settings' | 'admin';
 
 const MAIN = 'https://www.tryoszone.com';
 
@@ -28,12 +28,17 @@ export default function Shell({
   const level = student ? (student.access?.level === 'partial' ? 'Частичный доступ' : 'Полный доступ') : 'Без ID ученика';
   const nav: [Tab, string, string, () => JSX.Element][] = [
     ['home', '/', 'Главная', IHome],
+    ['exam', '/exam', 'Пробники', ITarget],
+    ['trainer', '/trainer', 'Тренажёр', ICheck],
+    ['survival', '/survival', 'Выживание', IFlame],
+    ['progress', '/progress', 'Прогресс', IChart],
     ['courses', '/courses', 'Мои курсы', IBook],
     ['schedule', '/schedule', 'Расписание', ICal],
-    ['progress', '/progress', 'Прогресс', IChart],
     ['settings', '/settings', 'Настройки', IGear],
   ];
   if (admin) nav.push(['admin', '/admin', 'Админка', IShield]);
+  // Внизу на телефоне помещается пять кнопок — самые частые.
+  const MOB: Tab[] = ['home', 'exam', 'trainer', 'progress', 'settings'];
 
   return (
     <div className="app">
@@ -44,8 +49,7 @@ export default function Shell({
             <Link key={k} href={href} className={active === k ? 'on' : undefined}><Icon />{label}</Link>
           ))}
           <div className="nav-lab">На сайте</div>
-          <a href={`${MAIN}/practice`} target="_blank" rel="noopener noreferrer"><ICheck />Тренажёр<span className="ext">↗</span></a>
-          <a href={`${MAIN}/test`} target="_blank" rel="noopener noreferrer"><IPlay />Пробный тест<span className="ext">↗</span></a>
+          <a href={MAIN} target="_blank" rel="noopener noreferrer"><IPlay />Сайт школы<span className="ext">↗</span></a>
         </nav>
         <div className="me">
           <div className="me-top">
@@ -66,8 +70,8 @@ export default function Shell({
       </main>
 
       <nav className="tabbar" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
-        {nav.filter(([k]) => k !== 'admin').map(([k, href, label, Icon]) => (
-          <Link key={k} href={href} className={active === k ? 'on' : undefined}><Icon />{label === 'Мои курсы' ? 'Курсы' : label === 'Настройки' ? 'Ещё' : label}</Link>
+        {nav.filter(([k]) => MOB.includes(k)).map(([k, href, label, Icon]) => (
+          <Link key={k} href={href} className={active === k ? 'on' : undefined}><Icon />{label === 'Настройки' ? 'Ещё' : label}</Link>
         ))}
       </nav>
     </div>

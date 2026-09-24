@@ -8,3 +8,7 @@ export const IGear = () => (<svg {...S}><circle cx="12" cy="12" r="3" /><path d=
 export const IShield = () => (<svg {...S}><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z" /></svg>);
 export const ICheck = () => (<svg {...S}><path d="m9 11 3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>);
 export const IPlay = () => (<svg {...S}><circle cx="12" cy="12" r="9" /><path d="M10 8.5v7l5.5-3.5z" /></svg>);
+export const ITarget = () => (<svg {...S}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" /></svg>);
+export const IFlame = () => (<svg {...S}><path d="M12 3c3 3.5 5 6 5 9a5 5 0 0 1-10 0c0-1.6.7-3 2-4.5.3 1.3 1 2 2 2.2C10.5 7.5 11 5.3 12 3z" /></svg>);
+export const IRedo = () => (<svg {...S}><path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 4v5h-5" /></svg>);
+export const ITrophy = () => (<svg {...S}><path d="M7 4h10v5a5 5 0 0 1-10 0z" /><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" /><path d="M10 20h4M12 14v6" /></svg>);
