@@ -1,9 +1,12 @@
 'use client';
 
 /*
- * Админка: ученики (ID, доступ, экзамен, группы, баллы) и группы
- * (курс, расписание, ссылки, сроки). Все изменения идут через серверные
- * действия из lib/admin-actions — они сами проверяют, что вошёл админ.
+ * Админка: ученики (ID, доступ, экзамен, группы, баллы), группы и
+ * индивидуальные занятия (курс, расписание, ссылки, сроки). Группа и
+ * индивидуалка устроены одинаково и отличаются полем kind: у индивидуальной
+ * ученик ровно один и выбирается прямо в карточке занятия.
+ * Все изменения идут через серверные действия из lib/admin-actions —
+ * они сами проверяют, что вошёл админ.
  */
 
 import { useRouter } from 'next/navigation';
@@ -43,8 +46,10 @@ export interface AStudent {
   last_seen: string | null;
 }
 export interface ASlot { dow: number; start: string; end: string }
+export type AKind = 'group' | 'solo';
 export interface AGroup {
   id: number;
+  kind: AKind;
   course: string;
   name: string;
   teacher: string | null;
@@ -64,6 +69,22 @@ export interface AEvent { id: number; group_id: number | null; student_id: strin
 const COLORS = ['#1E8F8A', '#2C7FB0', '#7A5AC8', '#C9791C', '#1F9D6B'];
 const KIND_RU: Record<string, string> = { deadline: 'Срок', lesson: 'Доп. занятие', exam: 'Пробный экзамен' };
 const SITE = 'bootcamp.tryoszone.com';
+
+/** Как называется сущность в текстах: группа или индивидуальные занятия. */
+const WORD = {
+  group: {
+    one: 'группа', oneAcc: 'группу', title: 'Группы', newOne: 'Новая группа',
+    add: '+ Новая группа', create: 'Создать группу', del: 'Удалить группу',
+    about: 'Группа — это курс с преподавателем и расписанием. Ученики видят свои группы в «Мои курсы» и «Расписание».',
+    none: 'Групп пока нет.',
+  },
+  solo: {
+    one: 'индивидуальные занятия', oneAcc: 'индивидуальные занятия', title: 'Индивидуально', newOne: 'Новые индивидуальные занятия',
+    add: '+ Новые занятия', create: 'Создать занятия', del: 'Удалить занятия',
+    about: 'Индивидуальные занятия — тот же курс с расписанием, но с одним учеником. Он видит их в «Мои курсы» и «Расписание» наравне с группами.',
+    none: 'Индивидуальных занятий пока нет.',
+  },
+} as const;
 
 /* --------------------------------------------------------- общие штуки */
 
@@ -98,6 +119,7 @@ function scheduleText(slots: ASlot[] | null): string {
 
 const groupTitle = (g: AGroup) => (g.name ? `${g.course} · ${g.name}` : g.course);
 const colorOf = (g: AGroup, i: number) => g.color || COLORS[i % COLORS.length];
+const isSolo = (g: AGroup) => g.kind === 'solo';
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -143,7 +165,9 @@ export default function AdminPanel({
   scores: AScore[];
   events: AEvent[];
 }) {
-  const [tab, setTab] = useState<'students' | 'groups'>('students');
+  const [tab, setTab] = useState<'students' | 'group' | 'solo'>('students');
+  const inGroups = groups.filter((g) => !isSolo(g));
+  const solos = groups.filter(isSolo);
 
   return (
     <>
@@ -151,13 +175,16 @@ export default function AdminPanel({
         <button type="button" role="tab" aria-selected={tab === 'students'} className={tab === 'students' ? 'on' : ''} onClick={() => setTab('students')}>
           Ученики · {students.length}
         </button>
-        <button type="button" role="tab" aria-selected={tab === 'groups'} className={tab === 'groups' ? 'on' : ''} onClick={() => setTab('groups')}>
-          Группы · {groups.length}
+        <button type="button" role="tab" aria-selected={tab === 'group'} className={tab === 'group' ? 'on' : ''} onClick={() => setTab('group')}>
+          Группы · {inGroups.length}
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'solo'} className={tab === 'solo' ? 'on' : ''} onClick={() => setTab('solo')}>
+          Индивидуально · {solos.length}
         </button>
       </div>
       {tab === 'students'
         ? <StudentsTab students={students} groups={groups} members={members} scores={scores} events={events} />
-        : <GroupsTab students={students} groups={groups} members={members} events={events} />}
+        : <CoursesTab kind={tab} students={students} groups={tab === 'solo' ? solos : inGroups} members={members} events={events} />}
     </>
   );
 }
@@ -260,7 +287,10 @@ function StudentRow({
   const act = useAction();
   const partial = st.access?.level === 'partial';
   const account = st.username ? `@${st.username}` : st.tg_username ? `TG @${st.tg_username}` : st.email || 'аккаунт привязан';
-  const gNames = groups.filter((g) => myGroups.includes(g.id)).map(groupTitle);
+  const mine = groups.filter((g) => myGroups.includes(g.id));
+  const gNames = mine.filter((g) => !isSolo(g)).map(groupTitle);
+  const sNames = mine.filter(isSolo).map((g) => `${g.course} (индивидуально)`);
+  const where = [...gNames, ...sNames];
 
   return (
     <div className="a-row">
@@ -268,7 +298,7 @@ function StudentRow({
         <div className="grow">
           <b>{st.name}</b>
           <i>
-            {gNames.length ? gNames.join(', ') : 'без группы'}
+            {where.length ? where.join(', ') : 'без занятий'}
             {st.exam_date ? ` · экзамен ${short(st.exam_date)}` : ''}
           </i>
         </div>
@@ -348,7 +378,11 @@ function StudentForm({
   const [sections, setSections] = useState<Partial<Record<Section, boolean>>>(
     initial?.access?.sections || { courses: true, schedule: true, scores: true, materials: true },
   );
-  const [picked, setPicked] = useState<number[]>(myGroups);
+  const inGroups = groups.filter((g) => !isSolo(g));
+  const mySolo = groups.filter((g) => isSolo(g) && myGroups.includes(g.id));
+  // В чекбоксах живут только группы: состав индивидуальных занятий задаётся
+  // в их собственной карточке, поэтому сюда они не попадают и не стираются.
+  const [picked, setPicked] = useState<number[]>(myGroups.filter((id) => inGroups.some((g) => g.id === id)));
 
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setSaved(false);
@@ -401,9 +435,9 @@ function StudentForm({
 
       <div className="field">
         <span className="field-label">Группы</span>
-        {groups.length ? (
+        {inGroups.length ? (
           <div className="checks">
-            {groups.map((g, i) => (
+            {inGroups.map((g, i) => (
               <label key={g.id} className="check">
                 <input type="checkbox" checked={picked.includes(g.id)} onChange={() => toggleGroup(g.id)} />
                 <span className="c-dot" style={{ background: colorOf(g, i) }} />
@@ -411,8 +445,25 @@ function StudentForm({
               </label>
             ))}
           </div>
-        ) : <small>Групп пока нет — создай их во вкладке «Группы и расписание».</small>}
+        ) : <small>Групп пока нет — создай их на вкладке «Группы».</small>}
       </div>
+
+      {initial ? (
+        <div className="field">
+          <span className="field-label">Индивидуальные занятия</span>
+          {mySolo.length ? (
+            <div className="checks">
+              {mySolo.map((g, i) => (
+                <span key={g.id} className="check as-tag">
+                  <span className="c-dot" style={{ background: colorOf(g, i) }} />
+                  {groupTitle(g)}
+                </span>
+              ))}
+            </div>
+          ) : <small>Индивидуальных занятий нет.</small>}
+          <small>Добавляются и меняются на вкладке «Индивидуально» — там же выбирается ученик.</small>
+        </div>
+      ) : null}
 
       <div className="field">
         <span className="field-label">Доступ по ID</span>
@@ -573,14 +624,16 @@ function EventsBlock({ groupId, studentId, events }: { groupId?: number; student
   );
 }
 
-/* ============================================================= группы */
+/* ============================== группы и индивидуальные занятия */
 
-function GroupsTab({
-  students, groups, members, events,
+function CoursesTab({
+  kind, students, groups, members, events,
 }: {
-  students: AStudent[]; groups: AGroup[]; members: AMember[]; events: AEvent[];
+  kind: AKind; students: AStudent[]; groups: AGroup[]; members: AMember[]; events: AEvent[];
 }) {
-  const [creating, setCreating] = useState(groups.length === 0);
+  const w = WORD[kind];
+  const solo = kind === 'solo';
+  const [creating, setCreating] = useState(groups.length === 0 && !(solo && !students.length));
   const [open, setOpen] = useState<number | null>(null);
 
   return (
@@ -588,20 +641,24 @@ function GroupsTab({
       {creating ? (
         <div className="card">
           <div className="card-head">
-            <h2>Новая группа</h2>
+            <h2>{w.newOne}</h2>
             {groups.length ? <button type="button" className="linklike" onClick={() => setCreating(false)}>Отмена</button> : null}
           </div>
-          <GroupForm index={groups.length} onDone={() => setCreating(false)} />
+          <GroupForm kind={kind} students={students} index={groups.length} onDone={() => setCreating(false)} />
         </div>
       ) : null}
 
       <div className="card">
         <div className="a-toolbar">
-          <p className="muted" style={{ margin: 0, flex: '1 1 260px' }}>
-            Группа — это курс с преподавателем и расписанием. Ученики видят свои группы в «Мои курсы» и «Расписание».
-          </p>
-          {!creating ? <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>+ Новая группа</button> : null}
+          <p className="muted" style={{ margin: 0, flex: '1 1 260px' }}>{w.about}</p>
+          {!creating ? <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>{w.add}</button> : null}
         </div>
+
+        {solo && !students.length ? (
+          <p className="muted" style={{ margin: '16px 0 0' }}>
+            Сначала заведи ученика на вкладке «Ученики» — индивидуальные занятия привязываются к нему.
+          </p>
+        ) : null}
 
         {groups.length ? (
           <div className="a-list" style={{ marginTop: 14 }}>
@@ -617,7 +674,9 @@ function GroupsTab({
                       <b>{groupTitle(g)}</b>
                       <i>{scheduleText(g.schedule)}{g.teacher ? ` · ${g.teacher}` : ''}</i>
                     </div>
-                    <span className="pill">{people.length} уч.</span>
+                    <span className={`pill${solo && !people.length ? ' warn' : ''}`}>
+                      {solo ? people[0]?.name || 'ученик не выбран' : `${people.length} уч.`}
+                    </span>
                     {g.starts || g.ends ? <span className="pill">{g.starts ? short(g.starts) : '…'} – {g.ends ? short(g.ends) : '…'}</span> : null}
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(isOpen ? null : g.id)} aria-expanded={isOpen}>
                       {isOpen ? 'Свернуть' : 'Открыть'}
@@ -628,22 +687,30 @@ function GroupsTab({
                       <div className="a-split">
                         <section>
                           <h3 className="a-h">Курс и расписание</h3>
-                          <GroupForm initial={g} index={i} />
+                          <GroupForm kind={kind} students={students} initial={g} studentId={people[0]?.id} index={i} />
                         </section>
                         <section>
-                          <h3 className="a-h">Ученики группы</h3>
+                          <h3 className="a-h">{solo ? 'Ученик' : 'Ученики группы'}</h3>
                           {people.length ? (
                             <ul className="mini-list" style={{ marginTop: 0 }}>
                               {people.map((p) => (
                                 <li key={p.id}><span>{p.name}</span><span className="code">{p.id}</span></li>
                               ))}
                             </ul>
-                          ) : <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>Пока никого. Добавить ученика в группу — в его карточке на вкладке «Ученики».</p>}
+                          ) : (
+                            <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>
+                              {solo
+                                ? 'Ученик не выбран — выбери его слева, иначе занятия никому не видны.'
+                                : 'Пока никого. Добавить ученика в группу — в его карточке на вкладке «Ученики».'}
+                            </p>
+                          )}
 
-                          <h3 className="a-h" style={{ marginTop: 22 }}>Сроки и доп. занятия группы</h3>
+                          <h3 className="a-h" style={{ marginTop: 22 }}>
+                            {solo ? 'Сроки и отдельные занятия' : 'Сроки и доп. занятия группы'}
+                          </h3>
                           <EventsBlock groupId={g.id} events={events.filter((e) => e.group_id === g.id)} />
 
-                          <DeleteGroup g={g} count={people.length} />
+                          <DeleteGroup g={g} count={people.length} kind={kind} />
                         </section>
                       </div>
                     </div>
@@ -652,31 +719,41 @@ function GroupsTab({
               );
             })}
           </div>
-        ) : !creating ? <p className="muted" style={{ margin: '16px 0 0' }}>Групп пока нет.</p> : null}
+        ) : !creating ? <p className="muted" style={{ margin: '16px 0 0' }}>{w.none}</p> : null}
       </div>
     </div>
   );
 }
 
-function DeleteGroup({ g, count }: { g: AGroup; count: number }) {
+function DeleteGroup({ g, count, kind }: { g: AGroup; count: number; kind: AKind }) {
   const act = useAction();
+  const w = WORD[kind];
   return (
     <div style={{ marginTop: 22 }}>
       <button
         type="button" className="btn btn-danger btn-sm" disabled={act.pending}
         onClick={() => {
-          const who = count ? ` ${count} уч. потеряют к ней доступ.` : '';
-          if (confirm(`Удалить группу «${groupTitle(g)}» и её сроки?${who}`)) act.run(() => deleteGroup(g.id));
+          const who = kind === 'solo'
+            ? ' Ученик перестанет их видеть.'
+            : count ? ` ${count} уч. потеряют к ней доступ.` : '';
+          if (confirm(`Удалить ${w.oneAcc} «${groupTitle(g)}» и её сроки?${who}`)) act.run(() => deleteGroup(g.id));
         }}
-      >Удалить группу</button>
+      >{w.del}</button>
       {act.error ? <p className="err" style={{ marginTop: 8 }}>{act.error}</p> : null}
     </div>
   );
 }
 
-function GroupForm({ initial, index, onDone }: { initial?: AGroup; index: number; onDone?: () => void }) {
+function GroupForm({
+  kind, students, initial, studentId, index, onDone,
+}: {
+  kind: AKind; students: AStudent[]; initial?: AGroup; studentId?: string; index: number; onDone?: () => void;
+}) {
   const act = useAction();
+  const solo = kind === 'solo';
+  const w = WORD[kind];
   const [saved, setSaved] = useState(false);
+  const [who, setWho] = useState(studentId || '');
   const [v, setV] = useState({
     course: initial?.course || '',
     name: initial?.name || '',
@@ -701,18 +778,29 @@ function GroupForm({ initial, index, onDone }: { initial?: AGroup; index: number
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const input: GroupInput = { ...v, schedule: slots };
+    const input: GroupInput = { ...v, kind, studentId: solo ? who : null, schedule: slots };
     act.run(() => saveGroup(initial?.id ?? null, input), () => { setSaved(true); onDone?.(); });
   };
 
   return (
     <form className="form" onSubmit={submit}>
-      <div className="fields-2">
-        <Field label="Курс">
-          <input className="input" required value={v.course} onChange={set('course')} placeholder="Математика TR-YÖS" />
+      {solo ? (
+        <Field label="Ученик" hint="Занятия увидит только он — в «Мои курсы» и «Расписании»">
+          <select className="select" required value={who} onChange={(e) => { setSaved(false); setWho(e.target.value); }}>
+            <option value="">— выбери ученика —</option>
+            {students.map((s) => (
+              <option key={s.id} value={s.id}>{s.name} · {s.id}</option>
+            ))}
+          </select>
         </Field>
-        <Field label="Группа">
-          <input className="input" value={v.name} onChange={set('name')} placeholder="Вечерняя, М-3" />
+      ) : null}
+
+      <div className="fields-2">
+        <Field label={solo ? 'Предмет' : 'Курс'}>
+          <input className="input" required value={v.course} onChange={set('course')} placeholder={solo ? 'Математика, индивидуально' : 'Математика TR-YÖS'} />
+        </Field>
+        <Field label={solo ? 'Пометка' : 'Группа'}>
+          <input className="input" value={v.name} onChange={set('name')} placeholder={solo ? 'Интенсив, 2 раза в неделю' : 'Вечерняя, М-3'} />
         </Field>
       </div>
       <Field label="Преподаватель">
@@ -736,7 +824,10 @@ function GroupForm({ initial, index, onDone }: { initial?: AGroup; index: number
           ))}
         </div>
         <div><button type="button" className="linklike" onClick={addSlot} style={{ marginTop: 4 }}>+ Ещё день</button></div>
-        <small>Время — по часовому поясу школы.</small>
+        <small>
+          Время — по часовому поясу школы.
+          {solo ? ' Если занятия плавающие, убери все дни и ставь их по одному в «Сроки и отдельные занятия».' : ''}
+        </small>
       </div>
 
       <div className="fields-3">
@@ -749,7 +840,7 @@ function GroupForm({ initial, index, onDone }: { initial?: AGroup; index: number
         <input className="input" value={v.link} onChange={set('link')} placeholder="https://meet.google.com/…" />
       </Field>
       <div className="fields-2">
-        <Field label="Чат группы"><input className="input" value={v.chat} onChange={set('chat')} placeholder="https://t.me/…" /></Field>
+        <Field label={solo ? 'Чат с преподавателем' : 'Чат группы'}><input className="input" value={v.chat} onChange={set('chat')} placeholder="https://t.me/…" /></Field>
         <Field label="Материалы"><input className="input" value={v.materials} onChange={set('materials')} placeholder="Google Drive, Notion…" /></Field>
       </div>
 
@@ -766,7 +857,7 @@ function GroupForm({ initial, index, onDone }: { initial?: AGroup; index: number
       </div>
 
       <div className="row" style={{ alignItems: 'center' }}>
-        <button className="btn btn-dark" disabled={act.pending}>{act.pending ? 'Сохраняю…' : initial ? 'Сохранить' : 'Создать группу'}</button>
+        <button className="btn btn-dark" disabled={act.pending}>{act.pending ? 'Сохраняю…' : initial ? 'Сохранить' : w.create}</button>
         {saved && initial ? <p className="okmsg">Сохранено</p> : null}
         {act.error ? <p className="err">{act.error}</p> : null}
       </div>

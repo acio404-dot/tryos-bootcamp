@@ -62,7 +62,7 @@ export function NextLessonCard({ lesson, today }: { lesson: Lesson | null; today
       <div className="card">
         <span className="kicker">Ближайшее занятие</span>
         <div className="lesson-when">Пока нет</div>
-        <p className="muted" style={{ margin: '8px 0 16px' }}>Когда школа добавит тебя в группу, здесь появится ближайшее занятие.</p>
+        <p className="muted" style={{ margin: '8px 0 16px' }}>Когда школа добавит тебя на курс — в группу или индивидуально, — здесь появится ближайшее занятие.</p>
         <Link className="btn btn-ghost" href="/schedule">Расписание</Link>
       </div>
     );
