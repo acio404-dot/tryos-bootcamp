@@ -22,8 +22,9 @@ export default async function Admin() {
     db`select student_id, group_id from bc_members`,
     db`select id, student_id, title, value::float as value, max::float as max, teacher, to_char(date, 'YYYY-MM-DD') as date
        from bc_scores order by date desc, id desc`,
-    db`select id, group_id, student_id, kind, title, to_char(at at time zone ${process.env.BOOTCAMP_TZ || 'Asia/Tashkent'}, 'YYYY-MM-DD HH24:MI') as at
-       from bc_events where at > now() - interval '7 days' order by at`,
+    db`select id, group_id, student_id, kind, title, scope, batch, link, note,
+         to_char(at at time zone ${process.env.BOOTCAMP_TZ || 'Asia/Tashkent'}, 'YYYY-MM-DD HH24:MI') as at
+       from bc_events where at > now() - interval '30 days' order by at`,
     db`select count(*)::int as n from bc_users`,
   ]);
 
