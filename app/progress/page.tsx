@@ -1,5 +1,6 @@
+import Link from 'next/link';
 import Shell from '@/components/Shell';
-import { MAIN, SECTION_RU, ScoreChart, tone } from '@/components/widgets';
+import { SECTION_RU, ScoreChart, tone } from '@/components/widgets';
 import { requireUser } from '@/lib/auth';
 import { can, examOf, progressOf, scoresOf, studentOfUser } from '@/lib/data';
 import { dateRu, plural } from '@/lib/format';
@@ -28,8 +29,8 @@ export default async function Progress() {
       <div className="top">
         <div><h1>Прогресс</h1><p>Задачи из тренажёра, пробные тесты и оценки преподавателей.</p></div>
         <div className="top-actions">
-          <a className="btn btn-ghost" href={`${MAIN}/practice`} target="_blank" rel="noopener noreferrer">Тренажёр</a>
-          <a className="btn btn-primary" href={`${MAIN}/test`} target="_blank" rel="noopener noreferrer">Пробный тест</a>
+          <Link className="btn btn-ghost" href="/trainer">Тренажёр</Link>
+          <Link className="btn btn-primary" href="/exam">Пробник</Link>
         </div>
       </div>
 
@@ -111,7 +112,7 @@ export default async function Progress() {
         ) : (
           <div className="empty-card" style={{ padding: '14px 0' }}>
             <p>Здесь появится точность по каждой теме, когда начнёшь решать задачи в тренажёре.</p>
-            <a className="btn btn-primary" href={`${MAIN}/practice`} target="_blank" rel="noopener noreferrer">Открыть тренажёр</a>
+            <Link className="btn btn-primary" href="/trainer">Открыть тренажёр</Link>
           </div>
         )}
       </div>
