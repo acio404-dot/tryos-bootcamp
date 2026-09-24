@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import Shell from '@/components/Shell';
 import ExamReview from '@/components/ExamReview';
+import ScoreDial from '@/components/ScoreDial';
 import { requireUser } from '@/lib/auth';
 import { examOf, studentOfUser } from '@/lib/data';
 import { gradeExam, itemById } from '@/lib/bank';
@@ -46,10 +47,11 @@ export default async function Result({ params }: { params: { id: string } }) {
 
   return (
     <Shell user={user} student={student} active="exam">
-      <div className="top">
-        <div>
+      <div className="res-hero">
+        <ScoreDial score={res.score} target={target} />
+        <div className="res-text">
           <span className="eyebrow">{run.title} · {dateRu(run.finished_at, false)}</span>
-          <h1>Балл {res.score}</h1>
+          <h1>{res.score >= (target ?? 0) && target ? 'Цель взята' : 'Результат пробника'}</h1>
           <p>
             {target
               ? res.score >= target
@@ -57,18 +59,32 @@ export default async function Result({ params }: { params: { id: string } }) {
                 : `До цели ${target} осталось ${target - res.score} ${plural(target - res.score, 'балл', 'балла', 'баллов')}.`
               : 'Балл считается по формуле экзамена: каждая ошибка съедает четверть верного ответа.'}
           </p>
-        </div>
-        <div className="top-actions">
-          <Link className="btn btn-ghost" href="/mistakes">Работа над ошибками</Link>
-          <Link className="btn btn-primary" href="/exam">Ещё пробник</Link>
+          <div className="res-act">
+            <Link className="btn btn-ghost" href="/mistakes">Работа над ошибками</Link>
+            <Link className="btn btn-primary" href="/exam">Ещё пробник</Link>
+          </div>
         </div>
       </div>
 
-      <div className="tiles">
-        <div className="tile"><b>{res.iq.correct} / {res.iq.total}</b><i>логика · точность {res.iq.accuracyPct} %</i></div>
-        <div className="tile"><b>{res.math.correct} / {res.math.total}</b><i>математика · точность {res.math.accuracyPct} %</i></div>
-        <div className="tile"><b>{res.iq.wrong + res.math.wrong}</b><i>ошибок · минус {((res.iq.wrong + res.math.wrong) * 0.25).toFixed(2)} верных</i></div>
-        <div className="tile"><b>{res.iq.blank + res.math.blank}</b><i>пропущено</i></div>
+      <div className="tiles mt">
+        <div className="tile accent-iq">
+          <b>{res.iq.correct} / {res.iq.total}</b>
+          <i>логика · точность {res.iq.accuracyPct} %</i>
+          <span className="bar"><em style={{ width: `${res.iq.accuracyPct}%` }} /></span>
+        </div>
+        <div className="tile accent-ma">
+          <b>{res.math.correct} / {res.math.total}</b>
+          <i>математика · точность {res.math.accuracyPct} %</i>
+          <span className="bar"><em style={{ width: `${res.math.accuracyPct}%` }} /></span>
+        </div>
+        <div className="tile accent-bad">
+          <b>{res.iq.wrong + res.math.wrong}</b>
+          <i>ошибок · минус {((res.iq.wrong + res.math.wrong) * 0.25).toFixed(2)} верных</i>
+        </div>
+        <div className="tile">
+          <b>{res.iq.blank + res.math.blank}</b>
+          <i>пропущено</i>
+        </div>
       </div>
 
       <div className="grid g-2 mt">
