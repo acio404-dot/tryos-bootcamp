@@ -5,6 +5,7 @@ import { studentOfUser } from '@/lib/data';
 import { CATALOG, TOTAL_PRACTICE, TOTAL_TOPICS } from '@/lib/bank';
 import { plural, sourceLine } from '@/lib/bank-types';
 import { mistakeCount } from '@/lib/runs';
+import { IArrow, IBrain, ISigma, ITarget } from '@/components/icons';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Тренажёр' };
@@ -35,26 +36,31 @@ export default async function Trainer() {
         <div className="tile"><b>{mistakes}</b><i>{plural(mistakes, 'задача ждёт', 'задачи ждут', 'задач ждут')} в работе над ошибками</i></div>
       </div>
 
-      {CATALOG.map((g) => (
-        <div className="card mt" key={g.key}>
-          <div className="card-head">
-            <h2>{g.label}</h2>
-            <span className="note" style={{ margin: 0 }}>{g.book}</span>
+      {CATALOG.map((g) => {
+        const Icon = g.key === 'iq' ? IBrain : g.key === 'algebra' ? ISigma : ITarget;
+        return (
+          <div className={`card mt sec sec-${g.key}`} key={g.key}>
+            <div className="card-head sec-head">
+              <span className="sec-ico"><Icon /></span>
+              <h2>{g.label}</h2>
+              <span className="note" style={{ margin: 0 }}>{g.book} · {g.topics.length} тем</span>
+            </div>
+            <Link className="topic-row mix" href={`/trainer/mix-${g.key}`}>
+              <span className="txt"><b>Все темы вперемешку</b><i>по одной задаче из каждой темы раздела</i></span>
+              <span className="go-ico"><IArrow /></span>
+            </Link>
+            <div className="topic-list">
+              {g.topics.map((t) => (
+                <Link className="topic-row" key={t.key} href={`/trainer/${t.key}`}>
+                  <span className="txt"><b>{t.label}</b><i>{sourceLine(t)}</i></span>
+                  <span className="st">{t.count}</span>
+                  <span className="go-ico"><IArrow /></span>
+                </Link>
+              ))}
+            </div>
           </div>
-          <Link className="topic-row mix" href={`/trainer/mix-${g.key}`}>
-            <span className="txt"><b>Все темы вперемешку</b><i>по одной задаче из каждой темы раздела</i></span>
-            <span className="st">→</span>
-          </Link>
-          <div className="topic-list">
-            {g.topics.map((t) => (
-              <Link className="topic-row" key={t.key} href={`/trainer/${t.key}`}>
-                <span className="txt"><b>{t.label}</b><i>{sourceLine(t)}</i></span>
-                <span className="st">{t.count}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </Shell>
   );
 }
