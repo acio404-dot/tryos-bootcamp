@@ -113,12 +113,21 @@ export default async function Home() {
           )}
         </div>
         <div className="card">
-          <div className="card-head"><h2>{events.length ? 'Ближайшие сроки' : 'Оценки преподавателей'}</h2><Link href={events.length ? '/schedule' : '/progress'}>{events.length ? 'Расписание' : 'Прогресс'}</Link></div>
+          <div className="card-head"><h2>{events.length ? 'Ближайшие события' : 'Оценки преподавателей'}</h2><Link href={events.length ? '/schedule' : '/progress'}>{events.length ? 'Расписание' : 'Прогресс'}</Link></div>
           {events.length ? (
             <ul className="list">
               {events.slice(0, 4).map((e) => (
                 <li key={e.id}>
-                  <span className="txt"><b>{e.title}</b><i>{e.kind === 'deadline' ? 'Срок сдачи' : e.kind === 'exam' ? 'Экзамен' : 'Занятие'} · {dateRu(e.at.slice(0, 10), false)}</i></span>
+                  <span className="txt">
+                    <b>{e.title}</b>
+                    <i>
+                      {e.kind === 'deadline' ? 'Срок сдачи' : e.kind === 'exam' ? 'Тестирование' : 'Доп. занятие'}
+                      {' · '}{dateRu(e.day, false)}
+                      {e.kind !== 'deadline' ? `, ${e.time}` : ''}
+                      {e.note ? ` · ${e.note}` : ''}
+                    </i>
+                  </span>
+                  {e.link ? <a className="go" href={e.link} target="_blank" rel="noopener noreferrer">Ссылка →</a> : null}
                 </li>
               ))}
             </ul>

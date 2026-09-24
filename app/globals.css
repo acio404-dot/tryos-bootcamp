@@ -186,6 +186,8 @@ button{font:inherit;cursor:pointer}
 .ev.tr{background:rgba(60,200,192,.12);border-color:var(--teal-deep)}
 .ev.tk{background:rgba(79,182,232,.13);border-color:#2C7FB0}
 .ev.dl{background:rgba(201,121,28,.12);border-color:var(--amber)}
+.ev a{display:inline-block;margin-top:4px;font-weight:800;color:var(--teal-deep);text-decoration:none}
+.ev a:hover{text-decoration:underline}
 .upcoming .list li{align-items:flex-start}
 .date-box{flex:0 0 auto;width:52px;text-align:center;border-radius:12px;background:var(--paper);padding:6px 0}
 .date-box b{display:block;font-family:var(--display);font-size:18px;letter-spacing:-.04em}
@@ -271,6 +273,8 @@ button{font:inherit;cursor:pointer}
 .check input{accent-color:var(--teal-deep)}
 /* тот же вид, но не кликается: показываем привязку, менять её надо в другом месте */
 .check.as-tag{cursor:default;background:rgba(11,22,38,.03);color:var(--ink-2)}
+/* длинный список выбора — прокручивается, а не растягивает форму */
+.pick-list{max-height:270px;overflow:auto;margin-top:8px;padding:2px;align-content:start}
 .btn-sm{padding:8px 14px;font-size:13px}
 .btn-danger{background:#fff;border-color:rgba(224,72,63,.35);color:#B8352D}
 .linklike{background:none;border:0;padding:0;color:var(--teal-deep);font-weight:800;cursor:pointer;font-size:13px}
