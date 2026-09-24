@@ -46,8 +46,8 @@ export default async function Survival() {
               <thead><tr><th>#</th><th>Ученик</th><th className="num">Серия</th></tr></thead>
               <tbody>
                 {board.map((r, i) => (
-                  <tr key={`${r.name}-${i}`} className={r.me ? 'me' : undefined}>
-                    <td className={i < 3 ? 'medal' : undefined}>{i + 1}</td>
+                  <tr key={`${r.name}-${i}`} className={r.me ? 'is-me' : undefined}>
+                    <td><span className={`place${i < 3 ? ` m${i + 1}` : ''}`}>{i + 1}</span></td>
                     <td>{r.name}{r.me ? ' · ты' : ''}</td>
                     <td className="num score">{r.best}</td>
                   </tr>
