@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import type { PublicQuestion, Verdict } from '@/lib/bank-types';
+import { IArrow, IFlame, IHeart } from './icons';
 
 const LETTERS = 'ABCDE';
 
@@ -109,8 +110,8 @@ export default function SurvivalFlow({ myBest }: { myBest: number }) {
           неверный забирает одну жизнь из трёх. Когда жизни кончатся, лучшая серия
           уйдёт в таблицу лидеров.</p>
         <p className="muted">Твой рекорд: <b>{myBest || 0}</b></p>
-        <button type="button" className="btn btn-primary" disabled={busy} onClick={start}>
-          {busy ? 'Готовлю…' : 'Начать серию'}
+        <button type="button" className="btn btn-primary btn-lg" disabled={busy} onClick={start}>
+          {busy ? 'Готовлю…' : <>Начать серию <IArrow /></>}
         </button>
         {error ? <p className="qerr">{error}</p> : null}
       </div>
@@ -137,9 +138,9 @@ export default function SurvivalFlow({ myBest }: { myBest: number }) {
   return (
     <>
       <div className="surv-bar">
-        <span className="flame">🔥 {run.streak}</span>
+        <span className="flame"><IFlame />{run.streak}</span>
         <span className="lives" aria-label={`Жизней: ${run.lives}`}>
-          {[0, 1, 2].map((k) => <i key={k} className={k < run.lives ? 'on' : undefined} />)}
+          {[0, 1, 2].map((k) => <i key={k} className={k < run.lives ? 'on' : undefined}><IHeart /></i>)}
         </span>
         <span className="st">Рекорд серии: {Math.max(run.best, myBest)}</span>
       </div>

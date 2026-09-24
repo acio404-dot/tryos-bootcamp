@@ -12,3 +12,13 @@ export const ITarget = () => (<svg {...S}><circle cx="12" cy="12" r="9" /><circl
 export const IFlame = () => (<svg {...S}><path d="M12 3c3 3.5 5 6 5 9a5 5 0 0 1-10 0c0-1.6.7-3 2-4.5.3 1.3 1 2 2 2.2C10.5 7.5 11 5.3 12 3z" /></svg>);
 export const IRedo = () => (<svg {...S}><path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 4v5h-5" /></svg>);
 export const ITrophy = () => (<svg {...S}><path d="M7 4h10v5a5 5 0 0 1-10 0z" /><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" /><path d="M10 20h4M12 14v6" /></svg>);
+export const IClock = () => (<svg {...S}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>);
+export const ILock = () => (<svg {...S}><rect x="4" y="10" width="16" height="10" rx="2.5" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>);
+export const IArrow = () => (<svg {...S}><path d="M5 12h13" /><path d="m12 6 6 6-6 6" /></svg>);
+export const IHeart = () => (<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 20.3 4.6 13a4.7 4.7 0 0 1 6.6-6.7l.8.8.8-.8A4.7 4.7 0 0 1 19.4 13z" /></svg>);
+export const IBolt = () => (<svg {...S}><path d="M13 3 5 13h6l-1 8 8-10h-6z" /></svg>);
+export const IList = () => (<svg {...S}><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" /></svg>);
+export const IGrid = () => (<svg {...S}><rect x="3.5" y="3.5" width="7" height="7" rx="2" /><rect x="13.5" y="3.5" width="7" height="7" rx="2" /><rect x="3.5" y="13.5" width="7" height="7" rx="2" /><rect x="13.5" y="13.5" width="7" height="7" rx="2" /></svg>);
+export const IMedal = () => (<svg {...S}><circle cx="12" cy="14" r="6" /><path d="M9 3h6l-1.5 5h-3z" /></svg>);
+export const ISigma = () => (<svg {...S}><path d="M17 5H7l5 7-5 7h10" /></svg>);
+export const IBrain = () => (<svg {...S}><path d="M9.5 4A2.5 2.5 0 0 0 7 6.5 2.5 2.5 0 0 0 5 9a2.5 2.5 0 0 0 1 2 2.5 2.5 0 0 0 1 4.6A2.5 2.5 0 0 0 9.5 20H12V4z" /><path d="M14.5 4A2.5 2.5 0 0 1 17 6.5 2.5 2.5 0 0 1 19 9a2.5 2.5 0 0 1-1 2 2.5 2.5 0 0 1-1 4.6A2.5 2.5 0 0 1 14.5 20H12" /></svg>);
