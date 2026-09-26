@@ -428,7 +428,8 @@ button{font:inherit;cursor:pointer}
 .qtext{font-size:16.5px;line-height:1.65}
 .qtext b{font-weight:800}
 .qfig{margin:18px 0 4px;padding:18px;background:linear-gradient(180deg,var(--paper),#fff);border:1px solid var(--line);border-radius:16px;overflow-x:auto}
-.qfig svg{display:block;max-width:100%;height:auto;margin:0 auto}
+/* рисунки в банке нарисованы примерно 340×240; шире ~1,4× они только растягиваются */
+.qfig svg{display:block;width:100%;max-width:480px;height:auto;margin:0 auto}
 .qopts{display:grid;gap:9px;margin-top:18px}
 .qopt{display:flex;align-items:center;gap:13px;width:100%;text-align:left;padding:13px 15px;border-radius:15px;border:1.5px solid var(--line);background:#fff;font:inherit;color:inherit;transition:border-color .13s,background .13s,transform .13s}
 .qopt:hover:not(:disabled){border-color:rgba(60,200,192,.5);transform:translateX(2px)}
@@ -560,7 +561,7 @@ button{font:inherit;cursor:pointer}
 .scr-body{overflow:auto;padding:16px 18px 14px}
 .scr-body .qtext{font-size:16px}
 .scr-body .qfig{margin:12px 0 0;padding:12px}
-.scr-body .qfig svg{max-height:230px;width:auto}
+.scr-body .qfig svg{max-width:380px}
 .scr-body .qopts{grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:7px;margin-top:14px}
 .scr-body .qopt{padding:8px 10px;border-radius:12px;gap:9px}
 .scr-body .ql{width:25px;height:25px;border-radius:8px}
@@ -572,7 +573,7 @@ button{font:inherit;cursor:pointer}
   .scr-act .btn-light{display:none}
   .scr-hint{display:none}
   .scr-head .qtag{display:none}
-  .scr-body .qfig svg{max-height:150px}
+  .scr-body .qfig svg{max-width:280px}
 }
 @media (prefers-reduced-motion:reduce){.scr-min svg{transition:none}}
 
