@@ -1,6 +1,6 @@
 /* Доступ по ID ученика — общий для сервера и браузера (без базы). */
 
-export type Section = 'courses' | 'schedule' | 'scores' | 'materials' | 'exams';
+export type Section = 'courses' | 'schedule' | 'scores' | 'materials' | 'exams' | 'trainer';
 
 export const SECTIONS: { key: Section; label: string }[] = [
   { key: 'courses', label: 'Курсы и группа' },
@@ -8,6 +8,7 @@ export const SECTIONS: { key: Section; label: string }[] = [
   { key: 'scores', label: 'Баллы и оценки преподавателей' },
   { key: 'materials', label: 'Материалы курса и чат группы' },
   { key: 'exams', label: 'Большие пробники (80 задач и другие форматы)' },
+  { key: 'trainer', label: 'Тренажёр по отдельным темам и работа над ошибками' },
 ];
 
 export interface Access {

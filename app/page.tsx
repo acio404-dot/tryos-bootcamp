@@ -8,6 +8,8 @@ import {
   addDays, can, eventsOf, examOf, groupsOfStudent, nowInTz, progressOf, scoresOf, studentOfUser, upcomingLessons,
 } from '@/lib/data';
 import { mistakeCount, myBestSurvival } from '@/lib/runs';
+import { streakOf } from '@/lib/streak';
+import StreakCard from '@/components/StreakCard';
 import { DOW_FULL, dateRu, firstName, plural } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -18,12 +20,13 @@ export default async function Home() {
   const now = nowInTz();
   const access = student?.access;
 
-  const [groups, progress, scores, mistakes, bestStreak] = await Promise.all([
+  const [groups, progress, scores, mistakes, bestStreak, streak] = await Promise.all([
     student && can(access, 'schedule') ? groupsOfStudent(student.id) : Promise.resolve([]),
     progressOf(user.id),
     student && can(access, 'scores') ? scoresOf(student.id) : Promise.resolve([]),
     mistakeCount(user.id),
     myBestSurvival(user.id),
+    streakOf(user.id),
   ]);
   const lessons = upcomingLessons(groups, 14, 1);
   const events = student && can(access, 'schedule')
@@ -40,7 +43,7 @@ export default async function Home() {
     .slice(0, 4);
 
   return (
-    <Shell user={user} student={student} active="home">
+    <Shell user={user} student={student} active="home" streak={streak}>
       <div className="top">
         <div>
           <h1>Привет, {firstName(user.name) || 'ученик'}!</h1>
@@ -52,6 +55,8 @@ export default async function Home() {
         </div>
       </div>
 
+      <StreakCard s={streak} />
+
       {!student ? (
         <div className="banner">
           <div>
@@ -62,14 +67,14 @@ export default async function Home() {
         </div>
       ) : null}
 
-      <ModeCards mistakes={mistakes} best={bestStreak} />
+      <ModeCards mistakes={mistakes} best={bestStreak} lockedMistakes={!can(access, 'trainer')} />
 
       <div className="grid g-2 mt">
         <ExamCard exam={exam} today={now.date} lastScore={lastScore} />
         <NextLessonCard lesson={lessons[0] || null} today={now.date} />
       </div>
 
-      <div className="grid g-4 mt">
+      <div className="grid g-3 mt">
         <div className="tile">
           <span>Последний тест</span>
           <b>{lastScore ?? '—'}</b>
@@ -81,7 +86,6 @@ export default async function Home() {
         </div>
         <div className="tile"><span>Решено за неделю</span><b>{progress.week}</b><i>{plural(progress.week, 'задача', 'задачи', 'задач')} в тренажёре</i></div>
         <div className="tile"><span>Точность</span><b>{progress.monthAcc === null ? '—' : `${progress.monthAcc} %`}</b><i>за последние 30 дней</i></div>
-        <div className="tile"><span>Серия</span><b>{progress.streak} {plural(progress.streak, 'день', 'дня', 'дней')}</b><i>подряд с решёнными задачами</i></div>
       </div>
 
       <div className="grid g-2 mt">

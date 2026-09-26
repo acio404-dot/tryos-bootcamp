@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { IArrow, ICheck, IFlame, IRedo, ITarget } from './icons';
+import { IArrow, ICheck, IFlame, ILock, IRedo, ITarget } from './icons';
 
 const MODES = [
   {
@@ -19,13 +19,13 @@ const MODES = [
   },
   {
     href: '/survival', key: 'survival', Icon: IFlame, title: 'Режим выживания',
-    text: 'Задачи без конца, три жизни, серия. Лучшая попадает в таблицу лидеров школы.',
+    text: 'Задачи без конца, 90 секунд на каждую, три жизни. Лучшая серия — в таблицу лидеров школы.',
     meta: 'рекорд школы',
   },
 ];
 
 /** Четыре режима тренажёра — главный вход в кабинет. */
-export default function ModeCards({ mistakes = 0, best = 0 }: { mistakes?: number; best?: number }) {
+export default function ModeCards({ mistakes = 0, best = 0, lockedMistakes = false }: { mistakes?: number; best?: number; lockedMistakes?: boolean }) {
   return (
     <div className="modes">
       {MODES.map(({ href, key, Icon, title, text, meta }) => (
@@ -35,9 +35,10 @@ export default function ModeCards({ mistakes = 0, best = 0 }: { mistakes?: numbe
           <i>{text}</i>
           <span className="mode-foot">
             <em>
-              {key === 'mistakes' && mistakes ? `${mistakes} в работе` : null}
+              {key === 'mistakes' && lockedMistakes ? <><ILock /> открывает школа</> : null}
+              {key === 'mistakes' && !lockedMistakes && mistakes ? `${mistakes} в работе` : null}
               {key === 'survival' && best ? `твой рекорд ${best}` : null}
-              {(key !== 'mistakes' && key !== 'survival') || (key === 'mistakes' && !mistakes) || (key === 'survival' && !best) ? meta : null}
+              {(key !== 'mistakes' && key !== 'survival') || (key === 'mistakes' && !mistakes && !lockedMistakes) || (key === 'survival' && !best) ? meta : null}
             </em>
             <IArrow />
           </span>

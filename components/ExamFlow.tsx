@@ -50,13 +50,23 @@ export default function ExamFlow({
   const [sending, setSending] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState('');
-  // Черновик во весь экран; открытым или закрытым он остаётся и после перезагрузки.
+  // «Решать на листе»: лист во весь экран; открытым или закрытым он остаётся и после перезагрузки.
   const [scratch, setScratch] = useState(false);
+  // Пока ученик ни разу не открыл лист, кнопка помечена «новое» и один раз показывается подсказка.
+  const [sheetSeen, setSheetSeen] = useState(true);
   useEffect(() => {
-    try { setScratch(localStorage.getItem('tryos-scratch-open') === '1'); } catch { /* хранилище недоступно */ }
+    try {
+      setScratch(localStorage.getItem('tryos-scratch-open') === '1');
+      setSheetSeen(localStorage.getItem('tryos-sheet-seen') === '1');
+    } catch { /* хранилище недоступно */ }
   }, []);
+  const markSeen = () => {
+    setSheetSeen(true);
+    try { localStorage.setItem('tryos-sheet-seen', '1'); } catch { /* хранилище недоступно */ }
+  };
   const toggleScratch = (on: boolean) => {
     setScratch(on);
+    if (on) markSeen();
     try { localStorage.setItem('tryos-scratch-open', on ? '1' : '0'); } catch { /* хранилище недоступно */ }
   };
   const dirty = useRef(false);
@@ -140,7 +150,7 @@ export default function ExamFlow({
   };
 
   // Горячие клавиши: 1–5 или A–E выбирают, стрелки листают.
-  // В черновике буквы переключают инструменты, поэтому там ответ выбирается только цифрами.
+  // На листе буквы переключают инструменты, поэтому там ответ выбирается только цифрами.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -167,17 +177,42 @@ export default function ExamFlow({
   return (
     <div className="exam-run">
       <div className="exam-bar">
-        <span className={`clock${low ? ' low' : ''}`}>{mmss(left)}</span>
+        <span className={`clock${low ? ' low' : ''}`} suppressHydrationWarning>{mmss(left)}</span>
         <span className="st">Задача {i + 1} из {questions.length}</span>
         <span className="st">Отвечено {answered}</span>
         <span className="bar-act">
-          <button type="button" className="btn btn-ghost" onClick={() => toggleScratch(true)}
-            title="Лист для записей и чертежей: у каждой задачи свой">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M21.17 6.81a2.82 2.82 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z" /><path d="m15 5 4 4" />
-            </svg>
-            Черновик
-          </button>
+          <span className="sheet-anchor">
+            <button type="button" className="btn sheet-btn" onClick={() => toggleScratch(true)}
+              title="Пиши и черти прямо на экране: у каждой задачи свой лист">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21.17 6.81a2.82 2.82 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z" /><path d="m15 5 4 4" />
+              </svg>
+              Решать на листе
+              {!sheetSeen ? <span className="sheet-new">новое</span> : null}
+            </button>
+            {!sheetSeen && !scratch ? (
+              <div className="sheet-intro" role="note" aria-label="Подсказка: решать на листе">
+                <svg className="sheet-intro-art" viewBox="0 0 120 84" aria-hidden="true">
+                  <rect x="1" y="1" width="118" height="82" rx="10" fill="#fff" />
+                  <path d="M12 21h96M12 41h96M12 61h96M34 1v82M60 1v82M86 1v82" stroke="#DCE6EF" strokeWidth="1" />
+                  <path d="M18 66 L46 20 L74 66 Z" fill="none" stroke="#2563EB" strokeWidth="2.6" strokeLinejoin="round" />
+                  <path d="M24 66v-7h7" fill="none" stroke="#2563EB" strokeWidth="1.8" />
+                  <path d="M84 30c4-6 12-6 14 0s-8 10-12 14h14" fill="none" stroke="#1F2937" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M58 47c10 2 18 1 26-3" fill="none" stroke="#FDE047" strokeWidth="9" strokeLinecap="round" opacity=".8" />
+                  <path d="M52 44h8M56 40v8" stroke="#DC2626" strokeWidth="2.4" strokeLinecap="round" />
+                </svg>
+                <div>
+                  <b>Решай прямо на экране</b>
+                  <p>Пиши, черти треугольники и считай столбиком, как на бумаге. У каждой задачи свой лист,
+                    записи сохраняются. Со стилусом ещё удобнее.</p>
+                  <div className="sheet-intro-act">
+                    <button type="button" className="btn btn-sm btn-primary" onClick={() => toggleScratch(true)}>Попробовать</button>
+                    <button type="button" className="btn btn-sm sheet-later" onClick={markSeen}>Не сейчас</button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </span>
           <button type="button" className="btn btn-ghost" onClick={() => setConfirm(true)} disabled={sending}>
             Завершить
           </button>
@@ -200,7 +235,16 @@ export default function ExamFlow({
       ) : null}
 
       <div className="qcard">
-        <div className="qtag">{q.section === 'iq' ? 'Логика' : 'Математика'}</div>
+        <div className="qhead">
+          <div className="qtag">{q.section === 'iq' ? 'Логика' : 'Математика'}</div>
+          <button type="button" className="qsheet" onClick={() => toggleScratch(true)}
+            title="Открыть лист для решения этой задачи">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21.17 6.81a2.82 2.82 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z" /><path d="m15 5 4 4" />
+            </svg>
+            Решить на листе
+          </button>
+        </div>
         <div className="qtext" dangerouslySetInnerHTML={{ __html: q.text }} />
         {q.figure ? <div className="qfig" dangerouslySetInnerHTML={{ __html: q.figure }} /> : null}
 

@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { db, one } from './db';
 import { currentUser, isAdmin } from './auth';
-import { makeStudentCode, type Access, type Section, type Slot } from './data';
+import { SECTIONS, makeStudentCode, type Access, type Section, type Slot } from './data';
 
 export interface AdminResult { ok?: boolean; error?: string; id?: string }
 
@@ -28,7 +28,8 @@ const intOrNull = (s: unknown) => {
 function accessOf(input: any): Access {
   if (input?.level !== 'partial') return { level: 'full' };
   const sections: Partial<Record<Section, boolean>> = {};
-  for (const k of ['courses', 'schedule', 'scores', 'materials'] as Section[]) sections[k] = Boolean(input?.sections?.[k]);
+  // все разделы из SECTIONS: раньше здесь был ручной список без «пробников», и их нельзя было открыть частично
+  for (const { key } of SECTIONS) sections[key as Section] = Boolean(input?.sections?.[key]);
   return { level: 'partial', sections };
 }
 
