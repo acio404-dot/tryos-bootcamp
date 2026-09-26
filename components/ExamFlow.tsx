@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PublicQuestion } from '@/lib/bank-types';
+import ExamScratch from './ExamScratch';
 
 const LETTERS = 'ABCDE';
 
@@ -49,6 +50,15 @@ export default function ExamFlow({
   const [sending, setSending] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState('');
+  // Черновик во весь экран; открытым или закрытым он остаётся и после перезагрузки.
+  const [scratch, setScratch] = useState(false);
+  useEffect(() => {
+    try { setScratch(localStorage.getItem('tryos-scratch-open') === '1'); } catch { /* хранилище недоступно */ }
+  }, []);
+  const toggleScratch = (on: boolean) => {
+    setScratch(on);
+    try { localStorage.setItem('tryos-scratch-open', on ? '1' : '0'); } catch { /* хранилище недоступно */ }
+  };
   const dirty = useRef(false);
   const finished = useRef(false);
 
@@ -130,37 +140,64 @@ export default function ExamFlow({
   };
 
   // Горячие клавиши: 1–5 или A–E выбирают, стрелки листают.
+  // В черновике буквы переключают инструменты, поэтому там ответ выбирается только цифрами.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (confirm) return;
+      if (scratch && e.key === 'Enter') return;
       if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); setI((n) => Math.min(n + 1, questions.length - 1)); return; }
       if (e.key === 'ArrowLeft') { e.preventDefault(); setI((n) => Math.max(n - 1, 0)); return; }
       const k = e.key.toUpperCase();
       const byDigit = '12345'.indexOf(k);
-      const byLetter = LETTERS.indexOf(k);
+      const byLetter = scratch ? -1 : LETTERS.indexOf(k);
       const idx = byDigit >= 0 ? byDigit : byLetter;
       if (idx >= 0 && idx < 5) { e.preventDefault(); pick(idx); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [i, questions.length]);
+  }, [i, questions.length, scratch, confirm]);
 
   const q = questions[i];
   const low = left < 300;
 
   return (
-    <div className="exam">
+    <div className="exam-run">
       <div className="exam-bar">
         <span className={`clock${low ? ' low' : ''}`}>{mmss(left)}</span>
         <span className="st">Задача {i + 1} из {questions.length}</span>
         <span className="st">Отвечено {answered}</span>
-        <button type="button" className="btn btn-ghost" onClick={() => setConfirm(true)} disabled={sending}>
-          Завершить
-        </button>
+        <span className="bar-act">
+          <button type="button" className="btn btn-ghost" onClick={() => toggleScratch(true)}
+            title="Лист для записей и чертежей: у каждой задачи свой">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21.17 6.81a2.82 2.82 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z" /><path d="m15 5 4 4" />
+            </svg>
+            Черновик
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={() => setConfirm(true)} disabled={sending}>
+            Завершить
+          </button>
+        </span>
       </div>
+
+      {scratch ? (
+        <ExamScratch
+          runId={runId}
+          questions={questions}
+          index={i}
+          setIndex={setI}
+          answers={answers}
+          pick={pick}
+          clock={mmss(left)}
+          low={low}
+          onClose={() => toggleScratch(false)}
+          onFinish={() => setConfirm(true)}
+        />
+      ) : null}
 
       <div className="qcard">
         <div className="qtag">{q.section === 'iq' ? 'Логика' : 'Математика'}</div>
