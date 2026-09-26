@@ -1,7 +1,9 @@
 import Shell from '@/components/Shell';
 import SurvivalFlow from '@/components/SurvivalFlow';
 import { requireUser } from '@/lib/auth';
-import { studentOfUser } from '@/lib/data';
+import { can, studentOfUser } from '@/lib/data';
+import { streaksOf } from '@/lib/streak';
+import StreakBadge from '@/components/StreakBadge';
 import { myBestSurvival, survivalBoard } from '@/lib/runs';
 import { dateRu } from '@/lib/format';
 
@@ -17,14 +19,15 @@ export default async function Survival() {
   ]);
 
   const myPlace = board.findIndex((r) => r.me) + 1;
+  const streaks = await streaksOf(board.map((r) => r.userId));
 
   return (
     <Shell user={user} student={student} active="survival">
       <div className="top">
         <div>
           <h1>Режим выживания</h1>
-          <p>Задачи без конца, три жизни, серия растёт с каждым верным ответом.
-            После пятого подряд чаще идут математика и геометрия — там дольше считать.</p>
+          <p>Задачи без конца, три жизни и 90 секунд на каждую задачу. Серия растёт с каждым
+            верным ответом; после пятого подряд чаще идут математика и геометрия. Закончить можно в любой момент.</p>
         </div>
       </div>
 
@@ -36,7 +39,7 @@ export default async function Survival() {
 
       <div className="grid g-2 mt">
         <div>
-          <SurvivalFlow myBest={best} />
+          <SurvivalFlow myBest={best} canMistakes={can(student?.access, 'trainer')} />
         </div>
 
         <div className="card">
@@ -48,7 +51,7 @@ export default async function Survival() {
                 {board.map((r, i) => (
                   <tr key={`${r.name}-${i}`} className={r.me ? 'is-me' : undefined}>
                     <td><span className={`place${i < 3 ? ` m${i + 1}` : ''}`}>{i + 1}</span></td>
-                    <td>{r.name}{r.me ? ' · ты' : ''}</td>
+                    <td><span className="who">{r.name}<StreakBadge n={streaks[r.userId] || 0} />{r.me ? <i> · ты</i> : null}</span></td>
                     <td className="num score">{r.best}</td>
                   </tr>
                 ))}

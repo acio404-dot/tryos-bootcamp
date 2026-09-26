@@ -158,6 +158,8 @@ export async function examHistory(userId: string, limit = 20): Promise<ExamRow[]
 
 export interface Survival {
   id: string;
+  /** Сколько секунд прошло с момента, когда ученик увидел текущую задачу. */
+  elapsed?: number | null;
   user_id: string;
   streak: number;
   best: number;
@@ -169,6 +171,10 @@ export interface Survival {
 }
 
 export const SURVIVAL_LIVES = 3;
+/** Время на одну задачу в выживании. */
+export const SURVIVAL_SECONDS = 90;
+/** Запас на сеть: ответ, пришедший чуть позже 90 секунд, ещё засчитывается. */
+export const SURVIVAL_GRACE = 4;
 
 export async function createSurvival(userId: string): Promise<Survival> {
   const id = newId();
@@ -177,13 +183,24 @@ export async function createSurvival(userId: string): Promise<Survival> {
 }
 
 export async function survivalRun(userId: string, id: string): Promise<Survival | null> {
-  return one<Survival>`select id, user_id, streak, best, lives, asked, cur_id, seen, alive
+  return one<Survival>`select id, user_id, streak, best, lives, asked, cur_id, seen, alive,
+      extract(epoch from now() - coalesce(cur_at, cur_issued))::float as elapsed
     from bc_survival where id = ${id} and user_id = ${userId}`;
 }
 
 export async function setSurvivalCurrent(id: string, questionId: string, seen: string[]): Promise<void> {
   await db`update bc_survival set cur_id = ${questionId}, seen = ${JSON.stringify(seen)}::jsonb,
-    asked = asked + 1 where id = ${id}`;
+    asked = asked + 1, cur_issued = now(), cur_at = null where id = ${id}`;
+}
+
+/**
+ * Ученик увидел задачу — с этого момента идут 90 секунд. Срабатывает один раз
+ * на задачу, поэтому повторным вызовом таймер не продлить; без вызова отсчёт
+ * идёт с момента выдачи задачи (так времени только меньше).
+ */
+export async function markSurvivalShown(userId: string, id: string): Promise<void> {
+  await db`update bc_survival set cur_at = now()
+    where id = ${id} and user_id = ${userId} and cur_id is not null and cur_at is null and alive`;
 }
 
 export async function applySurvivalAnswer(run: Survival, ok: boolean): Promise<Survival> {
@@ -202,7 +219,7 @@ export async function endSurvival(userId: string, id: string): Promise<void> {
     where id = ${id} and user_id = ${userId}`;
 }
 
-export interface BoardRow { name: string; best: number; asked: number; at: string; me: boolean }
+export interface BoardRow { userId: string; name: string; best: number; asked: number; at: string; me: boolean }
 
 /** Таблица лидеров: лучшая серия каждого ученика. */
 export async function survivalBoard(userId: string, limit = 20): Promise<BoardRow[]> {
@@ -215,6 +232,7 @@ export async function survivalBoard(userId: string, limit = 20): Promise<BoardRo
     order by best desc, at asc
     limit ${limit}`;
   return rows.map((r) => ({
+    userId: r.user_id,
     name: r.name || (r.username ? `@${r.username}` : 'Ученик'),
     best: r.best,
     asked: r.asked,

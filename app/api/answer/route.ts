@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { currentUser } from '@/lib/auth';
 import { answerAndRecord, type Mode } from '@/lib/runs';
+import { can, studentOfUser } from '@/lib/data';
+import { solvedToday, streakUpdate } from '@/lib/streak';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,8 +25,17 @@ export async function POST(req: Request) {
   const mode = (MODES as string[]).includes(String(body.mode)) ? (body.mode as Mode) : 'practice';
   if (!id || chosen < 0 || chosen > 4) return NextResponse.json({ error: 'Плохой запрос' }, { status: 400 });
 
+  if (mode === 'mistakes') {
+    const student = await studentOfUser(user.id);
+    if (!can(student?.access, 'trainer')) return NextResponse.json({ error: 'Работа над ошибками открыта ученикам школы' }, { status: 403 });
+  }
+
+  const before = await solvedToday(user.id);
   const v = await answerAndRecord(user.id, id, chosen, mode);
   if (!v) return NextResponse.json({ error: 'Задача не найдена' }, { status: 404 });
 
-  return NextResponse.json({ correct: v.correct, isCorrect: v.isCorrect, explanation: v.explanation });
+  return NextResponse.json({
+    correct: v.correct, isCorrect: v.isCorrect, explanation: v.explanation,
+    streakUp: await streakUpdate(user.id, before),
+  });
 }

@@ -2,7 +2,8 @@ import Link from 'next/link';
 import Shell from '@/components/Shell';
 import SeriesFlow from '@/components/SeriesFlow';
 import { requireUser } from '@/lib/auth';
-import { studentOfUser } from '@/lib/data';
+import { can, studentOfUser } from '@/lib/data';
+import Locked from '@/components/Locked';
 import { publicById } from '@/lib/bank';
 import { plural } from '@/lib/bank-types';
 import { mistakesOf } from '@/lib/runs';
@@ -13,7 +14,17 @@ export const metadata = { title: 'Работа над ошибками' };
 
 export default async function Mistakes() {
   const user = await requireUser();
-  const [student, rows] = await Promise.all([studentOfUser(user.id), mistakesOf(user.id, 30)]);
+  const student = await studentOfUser(user.id);
+  if (!can(student?.access, 'trainer')) {
+    return (
+      <Shell user={user} student={student} active="trainer">
+        <div className="top"><div><span className="eyebrow">Тренажёр</span><h1>Работа над ошибками</h1></div></div>
+        <Locked hasId={Boolean(student)} title="Работа над ошибками закрыта"
+          text="Здесь собираются задачи, в которых ты ошибся в тренажёре, пробниках и выживании, — чтобы дорешать их и закрыть пробелы." />
+      </Shell>
+    );
+  }
+  const rows = await mistakesOf(user.id, 30);
 
   const questions = rows
     .map((r) => publicById(r.question_id))

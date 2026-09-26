@@ -17,6 +17,7 @@ import {
   type AdminResult, type EventInput, type GroupInput, type StudentInput,
 } from '@/lib/admin-actions';
 import { SECTIONS, type Access, type Section } from '@/lib/access';
+import StreakBadge from './StreakBadge';
 import { DOW, dateShort, plural } from '@/lib/format';
 
 /** '2027-04-11' → '11 апр 2027' (год — только если не текущий). */
@@ -45,6 +46,8 @@ export interface AStudent {
   tg_username: string | null;
   email: string | null;
   last_seen: string | null;
+  /** Текущий стрик ученика (дней подряд с решёнными задачами). */
+  streak?: number;
 }
 export interface ASlot { dow: number; start: string; end: string }
 export type AKind = 'group' | 'solo';
@@ -316,7 +319,7 @@ function StudentRow({
     <div className="a-row">
       <div className="a-row-head">
         <div className="grow">
-          <b>{st.name}</b>
+          <b className="who">{st.name}<StreakBadge n={st.streak || 0} /></b>
           <i>
             {where.length ? where.join(', ') : 'без занятий'}
             {st.exam_date ? ` · экзамен ${short(st.exam_date)}` : ''}
@@ -510,7 +513,7 @@ function StudentForm({
             ))}
           </div>
         ) : null}
-        <small>Тренажёр, пробные тесты и личный прогресс доступны всем, у кого есть аккаунт.</small>
+        <small>Всем, у кого есть аккаунт, открыты: быстрая диагностика, тренажёр «все темы вперемешку», режим выживания и личный прогресс.</small>
       </div>
 
       <Field label="Заметка (видит только админ)">
@@ -946,7 +949,7 @@ function CoursesTab({
                           {people.length ? (
                             <ul className="mini-list" style={{ marginTop: 0 }}>
                               {people.map((p) => (
-                                <li key={p.id}><span>{p.name}</span><span className="code">{p.id}</span></li>
+                                <li key={p.id}><span className="who">{p.name}<StreakBadge n={p.streak || 0} /></span><span className="code">{p.id}</span></li>
                               ))}
                             </ul>
                           ) : (

@@ -163,6 +163,9 @@ function ensureSchema(): Promise<void> {
         ended_at timestamptz
       )`;
       await q`create index if not exists bc_survival_board on bc_survival (best desc, ended_at)`;
+      // Таймер задачи в выживании: когда задача выдана и когда ученик её увидел.
+      await q`alter table bc_survival add column if not exists cur_issued timestamptz`;
+      await q`alter table bc_survival add column if not exists cur_at timestamptz`;
     })().catch((e) => {
       ready = null;
       throw e;

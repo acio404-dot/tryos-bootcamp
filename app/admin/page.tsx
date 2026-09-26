@@ -3,6 +3,7 @@ import AdminPanel from '@/components/AdminPanel';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { studentOfUser } from '@/lib/data';
+import { streaksOf } from '@/lib/streak';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Админка' };
@@ -27,6 +28,9 @@ export default async function Admin() {
        from bc_events where at > now() - interval '30 days' order by at`,
     db`select count(*)::int as n from bc_users`,
   ]);
+
+  const streaks = await streaksOf(students.map((s: any) => s.user_id));
+  for (const s of students as any[]) s.streak = s.user_id ? streaks[s.user_id] || 0 : 0;
 
   return (
     <Shell user={user} student={me} active="admin">

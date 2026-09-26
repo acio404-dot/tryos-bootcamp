@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import Shell from '@/components/Shell';
 import { requireUser } from '@/lib/auth';
-import { studentOfUser } from '@/lib/data';
+import { can, studentOfUser } from '@/lib/data';
 import { CATALOG, TOTAL_PRACTICE, TOTAL_TOPICS } from '@/lib/bank';
 import { plural, sourceLine } from '@/lib/bank-types';
 import { mistakeCount } from '@/lib/runs';
-import { IArrow, IBrain, ISigma, ITarget } from '@/components/icons';
+import { IArrow, IBrain, ILock, ISigma, ITarget } from '@/components/icons';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Тренажёр' };
@@ -13,6 +13,7 @@ export const metadata = { title: 'Тренажёр' };
 export default async function Trainer() {
   const user = await requireUser();
   const [student, mistakes] = await Promise.all([studentOfUser(user.id), mistakeCount(user.id)]);
+  const open = can(student?.access, 'trainer');
 
   return (
     <Shell user={user} student={student} active="trainer">
@@ -24,7 +25,7 @@ export default async function Trainer() {
         </div>
         <div className="top-actions">
           <Link className="btn btn-ghost" href="/mistakes">
-            Работа над ошибками{mistakes ? ` · ${mistakes}` : ''}
+            {open ? null : <ILock />}Работа над ошибками{open && mistakes ? ` · ${mistakes}` : ''}
           </Link>
           <Link className="btn btn-primary" href="/exam">Пробники</Link>
         </div>
@@ -53,7 +54,7 @@ export default async function Trainer() {
               {g.topics.map((t) => (
                 <Link className="topic-row" key={t.key} href={`/trainer/${t.key}`}>
                   <span className="txt"><b>{t.label}</b><i>{sourceLine(t)}</i></span>
-                  <span className="st">{t.count}</span>
+                  {open ? <span className="st">{t.count}</span> : <span className="st lock-st"><ILock />школа</span>}
                   <span className="go-ico"><IArrow /></span>
                 </Link>
               ))}

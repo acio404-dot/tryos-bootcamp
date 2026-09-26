@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { PublicQuestion, Verdict } from '@/lib/bank-types';
+import { announceStreak } from '@/lib/streak-client';
 
 const LETTERS = 'ABCDE';
 
@@ -57,6 +58,7 @@ export default function QuestionCard({
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Не удалось проверить');
       setVerdict(data);
+      announceStreak(data.streakUp);
       onResult?.({ ...data, chosen });
       setTimeout(() => box.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60);
     } catch (e) {
