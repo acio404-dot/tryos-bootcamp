@@ -577,6 +577,28 @@ button{font:inherit;cursor:pointer}
 }
 @media (prefers-reduced-motion:reduce){.scr-min svg{transition:none}}
 
+/* ---------- кнопка «Решать на листе» и подсказка ---------- */
+.exam-bar .sheet-btn{background:linear-gradient(135deg,rgba(95,227,214,.26),rgba(79,182,232,.18));border-color:rgba(60,200,192,.6);color:var(--ink)}
+.exam-bar .sheet-btn:hover{background:linear-gradient(135deg,rgba(95,227,214,.4),rgba(79,182,232,.26));border-color:var(--teal)}
+.sheet-new{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:var(--teal-deep);color:#fff;border-radius:999px;padding:3px 7px;line-height:1}
+.sheet-anchor{position:relative;display:inline-flex}
+.sheet-intro{position:absolute;top:calc(100% + 14px);right:0;z-index:6;display:flex;gap:14px;align-items:flex-start;width:430px;padding:16px;border-radius:18px;background:var(--navy-900);color:#fff;box-shadow:0 24px 50px -20px rgba(5,16,32,.6)}
+.sheet-intro::before{content:'';position:absolute;top:-7px;right:48px;width:14px;height:14px;background:var(--navy-900);transform:rotate(45deg);border-radius:3px}
+.sheet-intro-art{flex:0 0 auto;width:112px;height:auto;border-radius:10px}
+.sheet-intro b{display:block;font-size:15px;margin-bottom:4px}
+.sheet-intro p{margin:0 0 12px;font-size:13px;line-height:1.5;color:#BACBDF}
+.sheet-intro-act{display:flex;gap:8px;flex-wrap:wrap}
+.sheet-intro .sheet-later{background:transparent;border-color:rgba(255,255,255,.22);color:#fff}
+.qhead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.qhead .qtag{margin-bottom:0}
+.qsheet{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1.5px solid rgba(60,200,192,.45);background:rgba(60,200,192,.08);color:var(--teal-deep);font-weight:800;font-size:12.5px;transition:background .13s,border-color .13s}
+.qsheet:hover{background:rgba(60,200,192,.16);border-color:var(--teal)}
+@media (max-width:640px){
+  .sheet-intro{right:auto;left:0;width:calc(100vw - 64px);max-width:380px}
+  .sheet-intro::before{right:auto;left:48px}
+  .sheet-intro-art{width:80px}
+}
+
 /* ---------- модалка ---------- */
 .modal{position:fixed;inset:0;background:rgba(7,18,31,.55);backdrop-filter:blur(3px);display:grid;place-items:center;padding:20px;z-index:50}
 .modal-box{background:#fff;border-radius:22px;padding:26px;max-width:450px;width:100%;box-shadow:0 34px 70px -24px rgba(0,0,0,.5)}
@@ -607,7 +629,7 @@ button{font:inherit;cursor:pointer}
 @media (max-width:900px){
   .topic-list{grid-template-columns:1fr}
   .qcard{padding:18px 16px}
-  .exam-bar{position:static}
+  .exam-bar{position:relative}
   .res-hero{gap:18px;padding:20px}
   .go-ico{opacity:1;transform:none}
 }

@@ -7,7 +7,7 @@ import type { Whiteboard } from '@/lib/tryos-whiteboard';
 const LETTERS = 'ABCDE';
 
 /*
- * Черновик пробника: во весь экран белый лист, задача — в карточке поверх него.
+ * «Решать на листе»: во весь экран белый лист, задача — в карточке поверх него.
  * У каждой задачи свой лист (по id задачи), листы хранятся в браузере для этого варианта:
  * переход к другой задаче открывает её лист, возврат назад — прежние записи.
  */
@@ -60,7 +60,7 @@ export default function ExamScratch({
 
   useEffect(() => { padRef.current?.setSheet(q.id); }, [q.id]);
 
-  // Пока открыт черновик, страница под ним не прокручивается.
+  // Пока открыт лист, страница под ним не прокручивается.
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -114,7 +114,7 @@ export default function ExamScratch({
   }, []);
 
   return (
-    <div className="scr" role="dialog" aria-modal="true" aria-label="Черновик">
+    <div className="scr" role="dialog" aria-modal="true" aria-label="Лист для решения">
       <div className="scr-bar">
         <span className={`clock${low ? ' low' : ''}`}>{clock}</span>
         <div className="scr-map" aria-label="Задачи">
@@ -130,7 +130,7 @@ export default function ExamScratch({
         </div>
         <span className="scr-act">
           <button type="button" className="btn btn-sm btn-light" onClick={onFinish}>Завершить</button>
-          <button type="button" className="btn btn-sm btn-primary" onClick={onClose}>Закрыть черновик</button>
+          <button type="button" className="btn btn-sm btn-primary" onClick={onClose}>Закрыть лист</button>
         </span>
       </div>
 
