@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import LoginForm from '@/components/LoginForm';
 import { currentUser } from '@/lib/auth';
@@ -28,11 +29,21 @@ export default async function Login({ searchParams }: { searchParams: { error?: 
             <li>Оценки преподавателей</li>
           </ul>
         </div>
-        <p style={{ fontSize: 13 }}>© TR-YÖS Zone · <a href="https://www.tryoszone.com" style={{ color: 'var(--teal-2)' }}>tryoszone.com</a></p>
+        <p style={{ fontSize: 13 }}>
+          © TR-YÖS Zone · <a href="https://www.tryoszone.com" style={{ color: 'var(--teal-2)' }}>tryoszone.com</a>
+          {' · '}<Link href="/privacy" style={{ color: 'var(--teal-2)' }}>Конфиденциальность</Link>
+          {' · '}<Link href="/terms" style={{ color: 'var(--teal-2)' }}>Условия</Link>
+        </p>
       </aside>
       <main className="auth-main">
         {hasDb() ? (
-          <LoginForm google={google} tgBot={tgBot} initialError={searchParams?.error || ''} />
+          <>
+            <LoginForm google={google} tgBot={tgBot} initialError={searchParams?.error || ''} />
+            <p className="auth-legal">
+              Входя, ты соглашаешься с <Link href="/terms">условиями использования</Link> и{' '}
+              <Link href="/privacy">политикой конфиденциальности</Link>.
+            </p>
+          </>
         ) : (
           <div className="auth-card">
             <h2>Почти готово</h2>
