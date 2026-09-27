@@ -39,7 +39,10 @@ export default async function Teach() {
     db<Omit<TStudent, 'streak' | 'bound' | 'last_score'> & { user_id: string | null; last_score: number | null }>`select s.id, s.name, s.user_id, m.group_id,
         s.phone, s.note, s.exam_name, to_char(s.exam_date, 'YYYY-MM-DD') as exam_date, s.exam_city, s.target_score,
         (select t.score from bc_tests t where t.student_id = s.id or (s.user_id is not null and t.user_id = s.user_id)
-          order by t.created_at desc limit 1) as last_score
+          order by t.created_at desc limit 1) as last_score,
+        (select count(*)::int from bc_attempts a where a.user_id = s.user_id and a.created_at > now() - interval '7 days') as week,
+        (select round(100.0 * count(*) filter (where a.correct) / nullif(count(*), 0))::int from bc_attempts a
+          where a.user_id = s.user_id and a.created_at > now() - interval '30 days') as acc
       from bc_members m join bc_students s on s.id = m.student_id where m.group_id = any(${ids}::int[]) order by s.name`,
     // события групп и личные сроки учеников этих групп
     db<TEvent>`select id, group_id, student_id, kind, title, link, note, batch,

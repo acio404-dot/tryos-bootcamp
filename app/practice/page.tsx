@@ -6,6 +6,7 @@ import { can, studentOfUser } from '@/lib/data';
 import { hhmm } from '@/lib/bank-types';
 import { mistakeCount, myBestSurvival, openExamRun } from '@/lib/runs';
 import { dateRu } from '@/lib/format';
+import { practiceAccess } from '@/lib/staff';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Решать' };
@@ -36,7 +37,7 @@ export default async function Practice() {
         </div>
       ) : null}
 
-      <div className="practice-modes"><ModeCards mistakes={mistakes} best={best} lockedMistakes={!can(student?.access, 'trainer')} /></div>
+      <div className="practice-modes"><ModeCards mistakes={mistakes} best={best} lockedMistakes={!can(await practiceAccess(user, student), 'trainer')} /></div>
     </Shell>
   );
 }

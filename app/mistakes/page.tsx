@@ -8,6 +8,7 @@ import { publicById } from '@/lib/bank';
 import { plural } from '@/lib/bank-types';
 import { mistakesOf } from '@/lib/runs';
 import type { PublicQuestion } from '@/lib/bank-types';
+import { practiceAccess } from '@/lib/staff';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Работа над ошибками' };
@@ -15,7 +16,7 @@ export const metadata = { title: 'Работа над ошибками' };
 export default async function Mistakes() {
   const user = await requireUser();
   const student = await studentOfUser(user.id);
-  if (!can(student?.access, 'trainer')) {
+  if (!can(await practiceAccess(user, student), 'trainer')) {
     return (
       <Shell user={user} student={student} active="trainer">
         <div className="top"><div><span className="eyebrow">Тренажёр</span><h1>Работа над ошибками</h1></div></div>

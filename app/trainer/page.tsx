@@ -6,6 +6,7 @@ import { CATALOG, TOTAL_PRACTICE, TOTAL_TOPICS } from '@/lib/bank';
 import { plural, sourceLine } from '@/lib/bank-types';
 import { mistakeCount } from '@/lib/runs';
 import { IArrow, IBrain, ILock, ISigma, ITarget } from '@/components/icons';
+import { practiceAccess } from '@/lib/staff';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Тренажёр' };
@@ -13,7 +14,7 @@ export const metadata = { title: 'Тренажёр' };
 export default async function Trainer() {
   const user = await requireUser();
   const [student, mistakes] = await Promise.all([studentOfUser(user.id), mistakeCount(user.id)]);
-  const open = can(student?.access, 'trainer');
+  const open = can(await practiceAccess(user, student), 'trainer');
 
   return (
     <Shell user={user} student={student} active="trainer">

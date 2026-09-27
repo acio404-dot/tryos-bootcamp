@@ -944,3 +944,14 @@ button{font:inherit;cursor:pointer}
 .t-sched-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .t-sched-head i{font-style:normal;color:var(--muted);font-size:13px}
 .t-edit-flat{margin:12px 0 0}
+/* ------------------------------------ статистика ученика */
+.crumbs{margin:0 0 4px;font-size:13px;color:var(--muted)}
+.crumbs a{color:var(--teal-deep);font-weight:700}
+.s-name{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.s-bars{display:grid;grid-template-columns:repeat(14,1fr);gap:6px;margin-top:6px}
+.s-bar{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.s-col{height:110px;width:100%;display:flex;align-items:flex-end}
+.s-col i{display:flex;align-items:flex-end;width:100%;min-height:2px;background:rgba(60,200,192,.28);border-radius:6px 6px 3px 3px;overflow:hidden}
+.s-col i em{display:block;width:100%;background:var(--green)}
+.s-bar span{font-size:11px;color:var(--muted);font-weight:700}
+.s-when{flex:0 0 auto;white-space:nowrap}

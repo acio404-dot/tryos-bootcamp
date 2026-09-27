@@ -49,10 +49,19 @@ export default async function Shell({
     ['schedule', '/schedule', 'Расписание', ICal],
     ['settings', '/settings', 'Настройки', IGear],
   ];
-  // Учитель: его кабинет первым пунктом, а если он не ученик — ученические разделы ему не нужны.
+  // Учитель: его кабинет первым пунктом. Все режимы решения задач ему открыты;
+  // если он не ученик, разделы про курсы и расписание ученика не нужны.
   if (teacher) {
     if (student) nav.splice(1, 0, ['teach', '/teach', 'Мои группы', IUsers]);
-    else nav.splice(0, nav.length, ['teach', '/teach', 'Мои группы', IUsers], ['practice', '/practice', 'Решать задачи', ITarget], ['settings', '/settings', 'Настройки', IGear]);
+    else {
+      nav.splice(0, nav.length,
+        ['teach', '/teach', 'Мои группы', IUsers],
+        ['exam', '/exam', 'Пробники', ITarget],
+        ['trainer', '/trainer', 'Тренажёр', ICheck],
+        ['survival', '/survival', 'Выживание', IFlame],
+        ['progress', '/progress', 'Прогресс', IChart],
+        ['settings', '/settings', 'Настройки', IGear]);
+    }
   }
   if (admin) nav.push(['admin', '/admin', 'Админка', IShield]);
   // Телефон: внизу пять вкладок — главная, расписание, «Решать» (все режимы), прогресс и меню со всем остальным.
@@ -61,7 +70,7 @@ export default async function Shell({
     ? [
       ['/teach', 'Группы', IUsers, active === 'teach'],
       ['/practice', 'Решать', ITarget, practiceTabs.includes(active)],
-      ['/settings', 'Настройки', IGear, active === 'settings'],
+      ['/progress', 'Прогресс', IChart, active === 'progress'],
     ]
     : [
       ['/', 'Главная', IHome, active === 'home'],
@@ -119,7 +128,7 @@ export default async function Shell({
         {tabs.map(([href, label, Icon, on]) => (
           <Link key={href} href={href} className={on ? 'on' : undefined} aria-current={on ? 'page' : undefined}><Icon />{label}</Link>
         ))}
-        <MenuButton className={['courses', 'admin', 'mistakes', ...(teacher && !student ? [] : ['settings'])].includes(active) ? 'on' : undefined} label="Меню: все разделы">
+        <MenuButton className={['courses', 'settings', 'admin', 'mistakes'].includes(active) ? 'on' : undefined} label="Меню: все разделы">
           <IGrid />Меню
         </MenuButton>
       </nav>

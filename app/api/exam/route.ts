@@ -6,6 +6,7 @@ import {
   createExamRun, examRun, finishExamRun, openExamRun, recordAttempts, saveExamAnswers,
 } from '@/lib/runs';
 import { db } from '@/lib/db';
+import { practiceAccess } from '@/lib/staff';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
 
     if (!FREE.has(spec.key)) {
       const student = await studentOfUser(user.id);
-      if (!can(student?.access, 'exams')) {
+      if (!can(await practiceAccess(user, student), 'exams')) {
         return NextResponse.json({ error: 'Этот формат открывает школа. Напиши преподавателю.' }, { status: 403 });
       }
     }

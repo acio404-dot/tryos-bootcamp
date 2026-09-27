@@ -12,6 +12,7 @@ import { mistakeCount, myBestSurvival } from '@/lib/runs';
 import { streakOf } from '@/lib/streak';
 import StreakCard from '@/components/StreakCard';
 import { DOW_FULL, dateRu, firstName, plural } from '@/lib/format';
+import { practiceAccess } from '@/lib/staff';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,7 +73,7 @@ export default async function Home() {
         </div>
       ) : null}
 
-      <div className="h-modes"><ModeCards mistakes={mistakes} best={bestStreak} lockedMistakes={!can(access, 'trainer')} /></div>
+      <div className="h-modes"><ModeCards mistakes={mistakes} best={bestStreak} lockedMistakes={!can(await practiceAccess(user, student), 'trainer')} /></div>
 
       <div className="grid g-2 mt home-duo">
         <div className="h-exam"><ExamCard exam={exam} today={now.date} lastScore={lastScore} /></div>

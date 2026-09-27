@@ -3,6 +3,7 @@ import { currentUser } from '@/lib/auth';
 import { answerAndRecord, type Mode } from '@/lib/runs';
 import { can, studentOfUser } from '@/lib/data';
 import { solvedToday, streakUpdate } from '@/lib/streak';
+import { practiceAccess } from '@/lib/staff';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
 
   if (mode === 'mistakes') {
     const student = await studentOfUser(user.id);
-    if (!can(student?.access, 'trainer')) return NextResponse.json({ error: 'Работа над ошибками открыта ученикам школы' }, { status: 403 });
+    if (!can(await practiceAccess(user, student), 'trainer')) return NextResponse.json({ error: 'Работа над ошибками открыта ученикам школы' }, { status: 403 });
   }
 
   const before = await solvedToday(user.id);
