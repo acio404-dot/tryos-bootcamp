@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { TeacherName } from './TeacherTag';
 import type { Exam, Lesson, TestRow, TopicStat } from '@/lib/data';
 import { dateRu, daysBetween, plural, whenRu } from '@/lib/format';
 
@@ -68,6 +69,7 @@ export function NextLessonCard({ lesson, today }: { lesson: Lesson | null; today
     );
   }
   const g = lesson.group;
+  const link = lesson.link !== undefined ? lesson.link : g.link;
   return (
     <div className="card">
       <span className="kicker">Ближайшее занятие</span>
@@ -75,11 +77,12 @@ export function NextLessonCard({ lesson, today }: { lesson: Lesson | null; today
       <div className="lesson-topic">{g.course}{g.name ? ` · ${g.name}` : ''}</div>
       <div className="lesson-meta">
         <div><span>Время</span><b>{lesson.start}–{lesson.end}</b></div>
-        {g.teacher ? <div><span>Преподаватель</span><b>{g.teacher}</b></div> : null}
-        <div><span>Где</span><b>{g.link ? 'онлайн, по ссылке' : 'ссылку пришлёт школа'}</b></div>
+        {lesson.topic ? <div><span>Тема</span><b>{lesson.topic}</b></div> : null}
+        {g.teacher ? <div><span>Преподаватель</span><b><TeacherName name={g.teacher} /></b></div> : null}
+        <div><span>Где</span><b>{link ? 'онлайн, по ссылке' : 'ссылку пришлёт школа'}</b></div>
       </div>
       <div className="row">
-        {g.link ? <a className="btn btn-primary" href={g.link} target="_blank" rel="noopener noreferrer">Подключиться</a> : null}
+        {link ? <a className="btn btn-primary" href={link} target="_blank" rel="noopener noreferrer">Подключиться</a> : null}
         <Link className="btn btn-ghost" href="/schedule">Всё расписание</Link>
       </div>
     </div>

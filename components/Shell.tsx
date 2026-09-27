@@ -1,14 +1,15 @@
 import Link from 'next/link';
 import { isAdmin, type User } from '@/lib/auth';
-import type { Student } from '@/lib/data';
+import { teacherOfUser, type Student } from '@/lib/data';
 import { initials } from '@/lib/format';
 import { streakOf, type StreakInfo } from '@/lib/streak';
 import StreakBadge from './StreakBadge';
+import TeacherTag from './TeacherTag';
 import StreakCelebrate from './StreakCelebrate';
 import MobileMenu, { MenuButton } from './MobileMenu';
-import { IBook, ICal, IChart, ICheck, IFlame, IGear, IGrid, IHome, ILogout, IPlay, IRedo, IShield, ITarget } from './icons';
+import { IBook, ICal, IChart, ICheck, IFlame, IGear, IGrid, IHome, ILogout, IPlay, IRedo, IShield, ITarget, IUsers } from './icons';
 
-export type Tab = 'home' | 'practice' | 'exam' | 'trainer' | 'survival' | 'courses' | 'schedule' | 'progress' | 'settings' | 'admin';
+export type Tab = 'home' | 'practice' | 'exam' | 'trainer' | 'survival' | 'courses' | 'schedule' | 'progress' | 'settings' | 'admin' | 'teach';
 
 const MAIN = 'https://www.tryoszone.com';
 
@@ -31,9 +32,13 @@ export default async function Shell({
   streak?: StreakInfo;
 }) {
   // Стрик нужен на каждой странице: огонёк у имени и достижение, когда стрик продлился.
-  const s = streak ?? await streakOf(user.id).catch(() => null);
+  const [s, teacher] = await Promise.all([
+    streak ?? streakOf(user.id).catch(() => null),
+    teacherOfUser(user.id).catch(() => null),
+  ]);
   const admin = isAdmin(user);
-  const level = student ? (student.access?.level === 'partial' ? 'Частичный доступ' : 'Полный доступ') : 'Без ID ученика';
+  const level = student ? (student.access?.level === 'partial' ? 'Частичный доступ' : 'Полный доступ') : teacher ? 'Кабинет учителя' : 'Без ID ученика';
+  const idLine = student ? `ID ${student.id}` : teacher ? `ID ${teacher.id}` : user.username ? `@${user.username}` : 'ID не привязан';
   const nav: [Tab, string, string, () => JSX.Element][] = [
     ['home', '/', 'Главная', IHome],
     ['exam', '/exam', 'Пробники', ITarget],
@@ -44,15 +49,26 @@ export default async function Shell({
     ['schedule', '/schedule', 'Расписание', ICal],
     ['settings', '/settings', 'Настройки', IGear],
   ];
+  // Учитель: его кабинет первым пунктом, а если он не ученик — ученические разделы ему не нужны.
+  if (teacher) {
+    if (student) nav.splice(1, 0, ['teach', '/teach', 'Мои группы', IUsers]);
+    else nav.splice(0, nav.length, ['teach', '/teach', 'Мои группы', IUsers], ['practice', '/practice', 'Решать задачи', ITarget], ['settings', '/settings', 'Настройки', IGear]);
+  }
   if (admin) nav.push(['admin', '/admin', 'Админка', IShield]);
   // Телефон: внизу пять вкладок — главная, расписание, «Решать» (все режимы), прогресс и меню со всем остальным.
   const practiceTabs: Tab[] = ['practice', 'exam', 'trainer', 'survival'];
-  const tabs: [string, string, () => JSX.Element, boolean][] = [
-    ['/', 'Главная', IHome, active === 'home'],
-    ['/schedule', 'Расписание', ICal, active === 'schedule'],
-    ['/practice', 'Решать', ITarget, practiceTabs.includes(active)],
-    ['/progress', 'Прогресс', IChart, active === 'progress'],
-  ];
+  const tabs: [string, string, () => JSX.Element, boolean][] = teacher && !student
+    ? [
+      ['/teach', 'Группы', IUsers, active === 'teach'],
+      ['/practice', 'Решать', ITarget, practiceTabs.includes(active)],
+      ['/settings', 'Настройки', IGear, active === 'settings'],
+    ]
+    : [
+      ['/', 'Главная', IHome, active === 'home'],
+      teacher ? ['/teach', 'Группы', IUsers, active === 'teach'] : ['/schedule', 'Расписание', ICal, active === 'schedule'],
+      ['/practice', 'Решать', ITarget, practiceTabs.includes(active)],
+      ['/progress', 'Прогресс', IChart, active === 'progress'],
+    ];
   const menuItems: [string, string, () => JSX.Element][] = [
     ['/exam', 'Пробники', ITarget],
     ['/trainer', 'Тренажёр', ICheck],
@@ -63,6 +79,7 @@ export default async function Shell({
     ['/progress', 'Прогресс', IChart],
     ['/settings', 'Настройки', IGear],
   ];
+  if (teacher) menuItems.unshift(['/teach', 'Мои группы', IUsers]);
   if (admin) menuItems.push(['/admin', 'Админка', IShield]);
 
   return (
@@ -79,7 +96,7 @@ export default async function Shell({
         <div className="me">
           <div className="me-top">
             <span className="ava">{initials(user.name)}</span>
-            <span><b className="me-name">{user.name || 'Ученик'}{s ? <StreakBadge n={s.current} /> : null}</b><i>{student ? `ID ${student.id}` : user.username ? `@${user.username}` : 'ID не привязан'}</i></span>
+            <span><b className="me-name">{user.name || 'Ученик'}{s ? <StreakBadge n={s.current} /> : null}{teacher ? <TeacherTag /> : null}</b><i>{idLine}</i></span>
           </div>
           <span className="access">{level}</span>
           <a href="/api/auth/logout">Выйти</a>
@@ -102,7 +119,7 @@ export default async function Shell({
         {tabs.map(([href, label, Icon, on]) => (
           <Link key={href} href={href} className={on ? 'on' : undefined} aria-current={on ? 'page' : undefined}><Icon />{label}</Link>
         ))}
-        <MenuButton className={['courses', 'settings', 'admin', 'mistakes'].includes(active) ? 'on' : undefined} label="Меню: все разделы">
+        <MenuButton className={['courses', 'admin', 'mistakes', ...(teacher && !student ? [] : ['settings'])].includes(active) ? 'on' : undefined} label="Меню: все разделы">
           <IGrid />Меню
         </MenuButton>
       </nav>
@@ -111,8 +128,8 @@ export default async function Shell({
         <div className="mm-me">
           <span className="ava">{initials(user.name)}</span>
           <span className="mm-who">
-            <b className="me-name">{user.name || 'Ученик'}{s ? <StreakBadge n={s.current} /> : null}</b>
-            <i>{student ? `ID ${student.id}` : user.username ? `@${user.username}` : 'ID не привязан'} · {level}</i>
+            <b className="me-name">{user.name || 'Ученик'}{s ? <StreakBadge n={s.current} /> : null}{teacher ? <TeacherTag /> : null}</b>
+            <i>{idLine} · {level}</i>
           </span>
         </div>
         <nav className="mm-grid" aria-label="Все разделы">

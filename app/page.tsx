@@ -3,9 +3,10 @@ import Shell from '@/components/Shell';
 import LinkIdForm from '@/components/LinkIdForm';
 import ModeCards from '@/components/ModeCards';
 import { ExamCard, NextLessonCard, ScoreChart, SECTION_RU, SectionBars, tone } from '@/components/widgets';
+import { redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth';
 import {
-  addDays, can, eventsOf, examOf, groupsOfStudent, nowInTz, progressOf, scoresOf, studentOfUser, upcomingLessons,
+  addDays, can, eventsOf, examOf, groupsOfStudent, nowInTz, progressOf, scoresOf, studentOfUser, teacherOfUser, upcomingLessons, withLessonInfo,
 } from '@/lib/data';
 import { mistakeCount, myBestSurvival } from '@/lib/runs';
 import { streakOf } from '@/lib/streak';
@@ -17,6 +18,8 @@ export const dynamic = 'force-dynamic';
 export default async function Home() {
   const user = await requireUser();
   const student = await studentOfUser(user.id);
+  // Учитель без ID ученика сразу попадает в свой кабинет.
+  if (!student && (await teacherOfUser(user.id))) redirect('/teach');
   const now = nowInTz();
   const access = student?.access;
 
@@ -28,7 +31,7 @@ export default async function Home() {
     myBestSurvival(user.id),
     streakOf(user.id),
   ]);
-  const lessons = upcomingLessons(groups, 14, 1);
+  const lessons = await withLessonInfo(upcomingLessons(groups, 14, 1));
   const events = student && can(access, 'schedule')
     ? await eventsOf(student.id, groups.map((g) => g.id), new Date().toISOString(), new Date(Date.now() + 21 * 86_400_000).toISOString())
     : [];

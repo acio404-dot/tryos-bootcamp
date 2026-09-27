@@ -1,4 +1,5 @@
 import Shell from '@/components/Shell';
+import { TeacherName } from '@/components/TeacherTag';
 import LinkIdForm from '@/components/LinkIdForm';
 import { scheduleText } from '@/components/widgets';
 import { requireUser } from '@/lib/auth';
@@ -58,7 +59,7 @@ export default async function Courses() {
                 <div className="facts">
                   <div><span>Расписание</span><b>{scheduleText(g.schedule)}</b></div>
                   <div><span>Период</span><b>{g.starts ? dateRu(g.starts, false) : '—'}{g.ends ? ` — ${dateRu(g.ends)}` : ''}</b></div>
-                  <div><span>Преподаватель</span><b>{g.teacher || '—'}</b></div>
+                  <div><span>Преподаватель</span><b>{g.teacher ? <TeacherName name={g.teacher} /> : '—'}</b></div>
                   <div><span>Занятия</span><b>{total ? `${Math.min(done, total)} из ${total}` : `${done} прошло`}</b></div>
                 </div>
                 {total ? (

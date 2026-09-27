@@ -63,6 +63,8 @@ export interface Group {
   course: string;
   name: string;
   teacher: string | null;
+  /** Учитель из списка учителей (bc_teachers), если назначен. */
+  teacher_id?: string | null;
   schedule: Slot[];
   starts: string | null;
   ends: string | null;
@@ -74,7 +76,7 @@ export interface Group {
 }
 
 export async function groupsOfStudent(studentId: string): Promise<Group[]> {
-  return db<Group>`select g.id, g.kind, g.course, g.name, g.teacher, g.schedule, to_char(g.starts, 'YYYY-MM-DD') as starts,
+  return db<Group>`select g.id, g.kind, g.course, g.name, g.teacher, g.teacher_id, g.schedule, to_char(g.starts, 'YYYY-MM-DD') as starts,
     to_char(g.ends, 'YYYY-MM-DD') as ends, g.total_lessons, g.link, g.chat, g.materials, g.color
     from bc_groups g join bc_members m on m.group_id = g.id
     where m.student_id = ${studentId} order by g.course`;
@@ -136,7 +138,32 @@ export const toMin = (hhmm: string) => {
   return (h || 0) * 60 + (m || 0);
 };
 
-export interface Lesson { date: string; start: string; end: string; group: Group }
+export interface Lesson {
+  date: string;
+  start: string;
+  end: string;
+  group: Group;
+  /** Ссылка на это занятие: своя на эту дату или постоянная ссылка группы. */
+  link?: string | null;
+  /** Тема, если учитель её указал. */
+  topic?: string | null;
+}
+
+/** Подставляет ссылки и темы, которые учитель задал для конкретных занятий. */
+export async function withLessonInfo<T extends Lesson>(lessons: T[]): Promise<T[]> {
+  if (!lessons.length) return lessons;
+  const ids = [...new Set(lessons.map((l) => l.group.id))];
+  const dates = lessons.map((l) => l.date).sort();
+  const rows = await db<{ group_id: number; date: string; start: string; link: string | null; topic: string | null }>`
+    select group_id, to_char(date, 'YYYY-MM-DD') as date, start, link, topic from bc_lesson_info
+    where group_id = any(${ids}::int[]) and date between ${dates[0]}::date and ${dates[dates.length - 1]}::date`;
+  const key = (g: number, d: string, s: string) => `${g}|${d}|${s}`;
+  const map = new Map(rows.map((r) => [key(r.group_id, r.date, r.start), r]));
+  return lessons.map((l) => {
+    const r = map.get(key(l.group.id, l.date, l.start));
+    return { ...l, link: r?.link || l.group.link, topic: r?.topic || null };
+  });
+}
 
 /** Занятия групп на ближайшие дни, начиная с текущего момента. */
 export function upcomingLessons(groups: Group[], days = 14, limit = 20): Lesson[] {
@@ -236,5 +263,30 @@ export function makeStudentCode(): string {
   return `TZ-${num}-${tail}`;
 }
 
+/** ID учителя: TZT-4821-KQ7M. По нему учитель привязывает карточку к своему аккаунту. */
+export function makeTeacherCode(): string {
+  return makeStudentCode().replace(/^TZ-/, 'TZT-');
+}
+
 export const normCode = (s: unknown) =>
-  String(s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^TZ(\d{4})([A-Z0-9]{4})$/, 'TZ-$1-$2');
+  String(s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+    .replace(/^TZT(\d{4})([A-Z0-9]{4})$/, 'TZT-$1-$2')
+    .replace(/^TZ(\d{4})([A-Z0-9]{4})$/, 'TZ-$1-$2');
+
+export const STUDENT_CODE = /^TZ-\d{4}-[A-Z0-9]{4}$/;
+export const TEACHER_CODE = /^TZT-\d{4}-[A-Z0-9]{4}$/;
+
+/* ------------------------------------------------------------- учитель */
+
+export interface Teacher { id: string; name: string; phone: string | null; note: string | null; user_id: string | null }
+
+export async function teacherOfUser(userId: string): Promise<Teacher | null> {
+  return one<Teacher>`select id, name, phone, note, user_id from bc_teachers where user_id = ${userId}`;
+}
+
+/** Группы и индивидуальные занятия, которые ведёт учитель. */
+export async function groupsOfTeacher(teacherId: string): Promise<Group[]> {
+  return db<Group>`select g.id, g.kind, g.course, g.name, g.teacher, g.teacher_id, g.schedule, to_char(g.starts, 'YYYY-MM-DD') as starts,
+    to_char(g.ends, 'YYYY-MM-DD') as ends, g.total_lessons, g.link, g.chat, g.materials, g.color
+    from bc_groups g where g.teacher_id = ${teacherId} order by g.kind, g.course, g.name`;
+}

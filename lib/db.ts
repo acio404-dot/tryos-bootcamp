@@ -73,6 +73,29 @@ function ensureSchema(): Promise<void> {
       // учеником. Колонка добавляется отдельно, чтобы уже созданная таблица
       // на рабочей базе тоже её получила.
       await q`alter table bc_groups add column if not exists kind text not null default 'group'`;
+      // Учителя: карточку заводит админ, учитель привязывает её к своему
+      // аккаунту по ID вида TZT-1234-ABCD — так же, как ученик.
+      await q`create table if not exists bc_teachers (
+        id text primary key,
+        name text not null,
+        phone text,
+        note text,
+        user_id text unique,
+        created_at timestamptz not null default now()
+      )`;
+      // У группы — учитель из списка. Колонка teacher остаётся: в ней имя,
+      // его видят ученики (и у старых групп без учителя из списка).
+      await q`alter table bc_groups add column if not exists teacher_id text`;
+      // Отдельное занятие по расписанию: своя ссылка и тема на конкретную дату.
+      await q`create table if not exists bc_lesson_info (
+        group_id int not null,
+        date date not null,
+        start text not null,
+        link text,
+        topic text,
+        updated_at timestamptz not null default now(),
+        primary key (group_id, date, start)
+      )`;
       await q`create table if not exists bc_members (
         student_id text not null,
         group_id int not null,
@@ -88,6 +111,8 @@ function ensureSchema(): Promise<void> {
         date date not null default current_date,
         created_at timestamptz not null default now()
       )`;
+      // Кто из учителей поставил оценку: учитель может удалить только свои.
+      await q`alter table bc_scores add column if not exists teacher_id text`;
       await q`create table if not exists bc_events (
         id serial primary key,
         group_id int,

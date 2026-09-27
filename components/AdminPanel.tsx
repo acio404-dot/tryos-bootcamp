@@ -14,10 +14,12 @@ import { useMemo, useState, useTransition } from 'react';
 import {
   addEvent, addEvents, addScore, createStudent, deleteEvent, deleteEventBatch, deleteGroup, deleteScore,
   deleteStudent, saveGroup, setExamDate, unbindStudent, updateStudent,
-  type AdminResult, type EventInput, type GroupInput, type StudentInput,
+  createTeacher, deleteTeacher, unbindTeacher, updateTeacher,
+  type AdminResult, type EventInput, type GroupInput, type StudentInput, type TeacherInput,
 } from '@/lib/admin-actions';
 import { SECTIONS, type Access, type Section } from '@/lib/access';
 import StreakBadge from './StreakBadge';
+import TeacherTag, { TeacherName } from './TeacherTag';
 import { DOW, dateShort, plural } from '@/lib/format';
 
 /** '2027-04-11' → '11 апр 2027' (год — только если не текущий). */
@@ -57,6 +59,7 @@ export interface AGroup {
   course: string;
   name: string;
   teacher: string | null;
+  teacher_id?: string | null;
   schedule: ASlot[] | null;
   starts: string | null;
   ends: string | null;
@@ -67,6 +70,10 @@ export interface AGroup {
   color: string | null;
 }
 export interface AMember { student_id: string; group_id: number }
+export interface ATeacher {
+  id: string; name: string; phone: string | null; note: string | null; user_id: string | null;
+  username?: string | null; tg_username?: string | null; email?: string | null; last_seen?: string | null;
+}
 export interface AScore { id: number; student_id: string; title: string; value: number; max: number; teacher: string | null; date: string }
 export interface AEvent {
   id: number;
@@ -165,6 +172,10 @@ function CopyButton({ text, label = 'Скопировать' }: { text: string; 
   return <button type="button" className="btn btn-ghost btn-sm" onClick={copy}>{done ? 'Скопировано ✓' : label}</button>;
 }
 
+const teacherInvite = (id: string, name: string) =>
+  `${name.split(' ')[0]}, здравствуйте! Ваш ID учителя TR-YÖS Zone: ${id}\n\n` +
+  `1. Откройте ${SITE}\n2. Войдите через Google, Telegram или создайте логин и пароль\n3. Введите ID — откроется кабинет учителя с вашими группами.`;
+
 const invite = (id: string, name: string) =>
   `${name.split(' ')[0]}, привет! Твой ID ученика TR-YÖS Zone: ${id}\n\n` +
   `1. Открой ${SITE}\n2. Войди через Google, Telegram или создай логин и пароль\n3. Введи ID — откроются твои курсы, расписание и баллы.`;
@@ -172,15 +183,16 @@ const invite = (id: string, name: string) =>
 /* ============================================================ панель */
 
 export default function AdminPanel({
-  students, groups, members, scores, events,
+  students, groups, members, scores, events, teachers,
 }: {
   students: AStudent[];
   groups: AGroup[];
   members: AMember[];
   scores: AScore[];
   events: AEvent[];
+  teachers: ATeacher[];
 }) {
-  const [tab, setTab] = useState<'students' | 'group' | 'solo' | 'events' | 'exam'>('students');
+  const [tab, setTab] = useState<'students' | 'teachers' | 'group' | 'solo' | 'events' | 'exam'>('students');
   const inGroups = groups.filter((g) => !isSolo(g));
   const solos = groups.filter(isSolo);
   const planned = events.filter((e) => e.batch).length;
@@ -190,6 +202,9 @@ export default function AdminPanel({
       <div className="tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'students'} className={tab === 'students' ? 'on' : ''} onClick={() => setTab('students')}>
           Ученики · {students.length}
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'teachers'} className={tab === 'teachers' ? 'on' : ''} onClick={() => setTab('teachers')}>
+          Учителя · {teachers.length}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'group'} className={tab === 'group' ? 'on' : ''} onClick={() => setTab('group')}>
           Группы · {inGroups.length}
@@ -206,12 +221,14 @@ export default function AdminPanel({
       </div>
       {tab === 'students' ? (
         <StudentsTab students={students} groups={groups} members={members} scores={scores} events={events} />
+      ) : tab === 'teachers' ? (
+        <TeachersTab teachers={teachers} groups={groups} members={members} />
       ) : tab === 'exam' ? (
         <ExamTab students={students} groups={groups} members={members} />
       ) : tab === 'events' ? (
         <EventsTab students={students} groups={groups} members={members} events={events} />
       ) : (
-        <CoursesTab kind={tab} students={students} groups={tab === 'solo' ? solos : inGroups} members={members} events={events} />
+        <CoursesTab kind={tab} students={students} groups={tab === 'solo' ? solos : inGroups} members={members} events={events} teachers={teachers} />
       )}
     </>
   );
@@ -1021,12 +1038,212 @@ function PlanRow({ plan, who }: { plan: Plan; who: string }) {
   );
 }
 
+/* ============================================================ учителя */
+
+function TeachersTab({ teachers, groups, members }: { teachers: ATeacher[]; groups: AGroup[]; members: AMember[] }) {
+  const [creating, setCreating] = useState(teachers.length === 0);
+  const [created, setCreated] = useState<{ id: string; name: string } | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const free = groups.filter((g) => !g.teacher_id);
+
+  return (
+    <div className="grid" style={{ gap: 16 }}>
+      {created ? (
+        <div className="newcode">
+          <div style={{ flex: '1 1 240px' }}>
+            <b>ID учителя для {created.name}</b>
+            <div className="muted" style={{ fontSize: 13 }}>Отправь учителю — он войдёт на {SITE} и введёт ID, откроется кабинет учителя.</div>
+          </div>
+          <span className="code">{created.id}</span>
+          <CopyButton text={created.id} label="Копировать ID" />
+          <CopyButton text={teacherInvite(created.id, created.name)} label="Копировать приглашение" />
+          <button type="button" className="linklike" onClick={() => setCreated(null)}>Скрыть</button>
+        </div>
+      ) : null}
+
+      {creating ? (
+        <div className="card">
+          <div className="card-head">
+            <h2>Новый учитель</h2>
+            {teachers.length ? <button type="button" className="linklike" onClick={() => setCreating(false)}>Отмена</button> : null}
+          </div>
+          <TeacherForm groups={groups} onDone={(r, name) => { setCreating(false); if (r.id) setCreated({ id: r.id, name }); }} />
+        </div>
+      ) : null}
+
+      <div className="card">
+        <div className="a-toolbar">
+          <p className="muted" style={{ margin: 0, flex: '1 1 260px' }}>
+            У учителя свой кабинет: его группы и индивидуальные занятия, ученики, расписание. Там он ставит ссылки на уроки,
+            доп. занятия и оценки. Учитель входит как обычно и вводит свой ID учителя.
+          </p>
+          {!creating ? <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>+ Новый учитель</button> : null}
+        </div>
+        {free.length && teachers.length ? (
+          <p className="note" style={{ margin: '12px 0 0' }}>
+            Без учителя: {free.map(groupTitle).join(', ')}.
+          </p>
+        ) : null}
+
+        {teachers.length ? (
+          <div className="a-list" style={{ marginTop: 14 }}>
+            {teachers.map((t) => {
+              const mine = groups.filter((g) => g.teacher_id === t.id);
+              const people = new Set(members.filter((m) => mine.some((g) => g.id === m.group_id)).map((m) => m.student_id)).size;
+              const account = t.username ? `@${t.username}` : t.tg_username ? `TG @${t.tg_username}` : t.email || 'аккаунт привязан';
+              const isOpen = open === t.id;
+              return (
+                <div className="a-row" key={t.id}>
+                  <div className="a-row-head">
+                    <div className="grow">
+                      <b className="who">{t.name}<TeacherTag /></b>
+                      <i>
+                        {mine.length ? mine.map((g) => (isSolo(g) ? `${g.course} (инд.)` : groupTitle(g))).join(', ') : 'без групп'}
+                        {people ? ` · ${people} уч.` : ''}
+                      </i>
+                    </div>
+                    <span className="code">{t.id}</span>
+                    {t.user_id
+                      ? <span className="pill on" title={t.last_seen ? `Последний вход: ${short(t.last_seen)}` : undefined}>{account}</span>
+                      : <span className="pill warn">ждёт входа</span>}
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(isOpen ? null : t.id)} aria-expanded={isOpen}>
+                      {isOpen ? 'Свернуть' : 'Открыть'}
+                    </button>
+                  </div>
+                  {isOpen ? (
+                    <div className="a-row-body">
+                      <div className="a-split">
+                        <section>
+                          <h3 className="a-h">Данные и группы</h3>
+                          <TeacherForm initial={t} groups={groups} />
+                        </section>
+                        <section>
+                          <h3 className="a-h">ID и аккаунт</h3>
+                          <div className="row" style={{ alignItems: 'center' }}>
+                            <CopyButton text={t.id} label="Копировать ID" />
+                            <CopyButton text={teacherInvite(t.id, t.name)} label="Копировать приглашение" />
+                          </div>
+                          <p className="muted" style={{ fontSize: 13, margin: '10px 0 0' }}>
+                            {t.user_id
+                              ? `Вошёл как ${account}${t.last_seen ? `, последний раз ${short(t.last_seen)}` : ''}.`
+                              : 'Учитель ещё не ввёл этот ID в своём аккаунте.'}
+                          </p>
+                          <TeacherDanger t={t} />
+                        </section>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : !creating ? <p className="muted" style={{ margin: '16px 0 0' }}>Учителей пока нет.</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function TeacherDanger({ t }: { t: ATeacher }) {
+  const act = useAction();
+  return (
+    <>
+      <div className="row" style={{ marginTop: 12 }}>
+        {t.user_id ? (
+          <button
+            type="button" className="btn btn-ghost btn-sm" disabled={act.pending}
+            onClick={() => { if (confirm(`Отвязать аккаунт от ${t.id}? Учитель сможет ввести ID заново.`)) act.run(() => unbindTeacher(t.id)); }}
+          >Отвязать аккаунт</button>
+        ) : null}
+        <button
+          type="button" className="btn btn-danger btn-sm" disabled={act.pending}
+          onClick={() => { if (confirm(`Удалить учителя ${t.name}? Группы останутся, в них останется только имя.`)) act.run(() => deleteTeacher(t.id)); }}
+        >Удалить учителя</button>
+      </div>
+      {act.error ? <p className="err" style={{ marginTop: 8 }}>{act.error}</p> : null}
+    </>
+  );
+}
+
+function TeacherForm({
+  initial, groups, onDone,
+}: {
+  initial?: ATeacher; groups: AGroup[]; onDone?: (r: AdminResult, name: string) => void;
+}) {
+  const act = useAction();
+  const [saved, setSaved] = useState(false);
+  const [v, setV] = useState({ name: initial?.name || '', phone: initial?.phone || '', note: initial?.note || '' });
+  const [picked, setPicked] = useState<number[]>(initial ? groups.filter((g) => g.teacher_id === initial.id).map((g) => g.id) : []);
+  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { setSaved(false); setV({ ...v, [k]: e.target.value }); };
+  const other = (g: AGroup) => g.teacher_id && g.teacher_id !== initial?.id;
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const input: TeacherInput = { ...v, groups: picked };
+    act.run(
+      () => (initial ? updateTeacher(initial.id, input) : createTeacher(input)),
+      (r) => {
+        setSaved(true);
+        onDone?.(r, v.name.trim());
+        if (!initial) { setV({ name: '', phone: '', note: '' }); setPicked([]); }
+      },
+    );
+  };
+
+  const list = (solo: boolean) => groups.filter((g) => isSolo(g) === solo);
+  const block = (solo: boolean) => {
+    const gs = list(solo);
+    if (!gs.length) return <small>{solo ? 'Индивидуальных занятий пока нет.' : 'Групп пока нет.'}</small>;
+    return (
+      <div className="checks">
+        {gs.map((g, i) => (
+          <label key={g.id} className="check" title={other(g) ? `Сейчас ведёт: ${g.teacher}` : undefined}>
+            <input type="checkbox" checked={picked.includes(g.id)} onChange={() => { setSaved(false); setPicked(toggle(picked, g.id)); }} />
+            <span className="c-dot" style={{ background: colorOf(g, i) }} />
+            {groupTitle(g)}
+            {other(g) && !picked.includes(g.id) ? <span className="muted"> · {g.teacher}</span> : null}
+          </label>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <form className="form" onSubmit={submit}>
+      <div className="fields-2">
+        <Field label="Имя и фамилия">
+          <input className="input" required value={v.name} onChange={set('name')} placeholder="Дилноза Рахимова" />
+        </Field>
+        <Field label="Телефон или Telegram">
+          <input className="input" value={v.phone} onChange={set('phone')} placeholder="+998 90 123 45 67" />
+        </Field>
+      </div>
+      <div className="field">
+        <span className="field-label">Ведёт группы</span>
+        {block(false)}
+      </div>
+      <div className="field">
+        <span className="field-label">Индивидуальные занятия</span>
+        {block(true)}
+        <small>Если занятия уже ведёт другой учитель, при сохранении они перейдут к этому.</small>
+      </div>
+      <Field label="Заметка" hint="Видна только админам">
+        <textarea className="input" rows={2} value={v.note} onChange={set('note')} placeholder="Предметы, часы, оплата…" />
+      </Field>
+      <div className="row" style={{ alignItems: 'center' }}>
+        <button className="btn btn-dark" disabled={act.pending}>{act.pending ? 'Сохраняю…' : initial ? 'Сохранить' : 'Добавить учителя'}</button>
+        {saved && initial ? <p className="okmsg">Сохранено</p> : null}
+        {act.error ? <p className="err">{act.error}</p> : null}
+      </div>
+    </form>
+  );
+}
+
 /* ============================== группы и индивидуальные занятия */
 
 function CoursesTab({
-  kind, students, groups, members, events,
+  kind, students, groups, members, events, teachers,
 }: {
-  kind: AKind; students: AStudent[]; groups: AGroup[]; members: AMember[]; events: AEvent[];
+  kind: AKind; students: AStudent[]; groups: AGroup[]; members: AMember[]; events: AEvent[]; teachers: ATeacher[];
 }) {
   const w = WORD[kind];
   const solo = kind === 'solo';
@@ -1041,7 +1258,7 @@ function CoursesTab({
             <h2>{w.newOne}</h2>
             {groups.length ? <button type="button" className="linklike" onClick={() => setCreating(false)}>Отмена</button> : null}
           </div>
-          <GroupForm kind={kind} students={students} index={groups.length} onDone={() => setCreating(false)} />
+          <GroupForm kind={kind} students={students} teachers={teachers} index={groups.length} onDone={() => setCreating(false)} />
         </div>
       ) : null}
 
@@ -1069,8 +1286,13 @@ function CoursesTab({
                     <span className="c-dot" style={{ background: colorOf(g, i), width: 12, height: 12 }} />
                     <div className="grow">
                       <b>{groupTitle(g)}</b>
-                      <i>{scheduleText(g.schedule)}{g.teacher ? ` · ${g.teacher}` : ''}</i>
+                      <i>{scheduleText(g.schedule)}</i>
                     </div>
+                    {g.teacher ? (
+                      g.teacher_id
+                        ? <span className="pill"><TeacherName name={g.teacher} /></span>
+                        : <span className="pill warn" title="Учитель не выбран из списка — у него нет кабинета">{g.teacher} · без аккаунта</span>
+                    ) : <span className="pill warn">учитель не назначен</span>}
                     <span className={`pill${solo && !people.length ? ' warn' : ''}`}>
                       {solo ? people[0]?.name || 'ученик не выбран' : `${people.length} уч.`}
                     </span>
@@ -1084,7 +1306,7 @@ function CoursesTab({
                       <div className="a-split">
                         <section>
                           <h3 className="a-h">Курс и расписание</h3>
-                          <GroupForm kind={kind} students={students} initial={g} studentId={people[0]?.id} index={i} />
+                          <GroupForm kind={kind} students={students} teachers={teachers} initial={g} studentId={people[0]?.id} index={i} />
                         </section>
                         <section>
                           <h3 className="a-h">{solo ? 'Ученик' : 'Ученики группы'}</h3>
@@ -1142,15 +1364,17 @@ function DeleteGroup({ g, count, kind }: { g: AGroup; count: number; kind: AKind
 }
 
 function GroupForm({
-  kind, students, initial, studentId, index, onDone,
+  kind, students, teachers, initial, studentId, index, onDone,
 }: {
-  kind: AKind; students: AStudent[]; initial?: AGroup; studentId?: string; index: number; onDone?: () => void;
+  kind: AKind; students: AStudent[]; teachers: ATeacher[]; initial?: AGroup; studentId?: string; index: number; onDone?: () => void;
 }) {
   const act = useAction();
   const solo = kind === 'solo';
   const w = WORD[kind];
   const [saved, setSaved] = useState(false);
   const [who, setWho] = useState(studentId || '');
+  // Учитель из списка ('' — не выбран, 'other' — просто имя без кабинета)
+  const [tid, setTid] = useState<string>(initial?.teacher_id || (initial?.teacher ? 'other' : ''));
   const [v, setV] = useState({
     course: initial?.course || '',
     name: initial?.name || '',
@@ -1175,7 +1399,11 @@ function GroupForm({
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const input: GroupInput = { ...v, kind, studentId: solo ? who : null, schedule: slots };
+    const input: GroupInput = {
+      ...v, kind, studentId: solo ? who : null, schedule: slots,
+      teacherId: tid && tid !== 'other' ? tid : null,
+      teacher: tid === 'other' ? v.teacher : '',
+    };
     act.run(() => saveGroup(initial?.id ?? null, input), () => { setSaved(true); onDone?.(); });
   };
 
@@ -1200,9 +1428,21 @@ function GroupForm({
           <input className="input" value={v.name} onChange={set('name')} placeholder={solo ? 'Интенсив, 2 раза в неделю' : 'Вечерняя, М-3'} />
         </Field>
       </div>
-      <Field label="Преподаватель">
-        <input className="input" value={v.teacher} onChange={set('teacher')} placeholder="Имя преподавателя" />
+      <Field
+        label="Учитель"
+        hint={teachers.length ? 'Учитель увидит эти занятия в своём кабинете и сможет ставить ссылки и доп. занятия' : 'Учителей пока нет — добавь их на вкладке «Учителя»'}
+      >
+        <select className="select" value={tid} onChange={(e) => { setSaved(false); setTid(e.target.value); }}>
+          <option value="">— не назначен —</option>
+          {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}{t.user_id ? '' : ' (ещё не вошёл)'}</option>)}
+          <option value="other">Другой (только имя, без кабинета)</option>
+        </select>
       </Field>
+      {tid === 'other' ? (
+        <Field label="Имя учителя">
+          <input className="input" value={v.teacher} onChange={set('teacher')} placeholder="Имя преподавателя" />
+        </Field>
+      ) : null}
 
       <div className="field">
         <span className="field-label">Занятия по неделям</span>
