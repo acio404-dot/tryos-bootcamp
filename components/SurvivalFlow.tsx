@@ -5,6 +5,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PublicQuestion, Verdict } from '@/lib/bank-types';
 import { announceStreak } from '@/lib/streak-client';
 import { IArrow, IClock, IFlame, IHeart } from './icons';
+import SheetOverlay from './SheetOverlay';
+import SheetButton, { SheetChip } from './SheetButton';
+import { PRACTICE_SHEETS, useSheetOpen } from '@/lib/use-sheet';
 
 const LETTERS = 'ABCDE';
 const SECONDS = 90;
@@ -39,6 +42,7 @@ export default function SurvivalFlow({ myBest, canMistakes = true }: { myBest: n
   const [error, setError] = useState('');
   const [left, setLeft] = useState(SECONDS);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [sheet, setSheet] = useSheetOpen();
   const deadline = useRef(0);
   const box = useRef<HTMLDivElement>(null);
 
@@ -134,6 +138,8 @@ export default function SurvivalFlow({ myBest, canMistakes = true }: { myBest: n
 
   const nextRef = useRef(next);
   nextRef.current = next;
+  const sheetRef = useRef(sheet);
+  sheetRef.current = sheet;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -149,7 +155,8 @@ export default function SurvivalFlow({ myBest, canMistakes = true }: { myBest: n
       if (verdict) return;
       const k = e.key.toUpperCase();
       const byDigit = '12345'.indexOf(k);
-      const byLetter = LETTERS.indexOf(k);
+      // на листе буквы переключают инструменты рисования, ответ — цифрами
+      const byLetter = sheetRef.current ? -1 : LETTERS.indexOf(k);
       const i = byDigit >= 0 ? byDigit : byLetter;
       if (i >= 0 && i < 5) setChosen(i);
     };
@@ -193,84 +200,123 @@ export default function SurvivalFlow({ myBest, canMistakes = true }: { myBest: n
   const pct = Math.max(0, Math.min(100, (left / SECONDS) * 100));
   const hurry = !verdict && left <= 15;
 
+  const stats = (
+    <>
+      <span className="flame"><IFlame />{run.streak}</span>
+      <span className="lives" aria-label={`Жизней: ${run.lives}`}>
+        {[0, 1, 2].map((k) => <i key={k} className={k < run.lives ? 'on' : undefined}><IHeart /></i>)}
+      </span>
+      <span className={`surv-clock${hurry ? ' hurry' : ''}${verdict ? ' paused' : ''}`}
+        role="timer" aria-label={verdict ? 'Таймер на паузе' : `Осталось ${left} секунд`}>
+        <IClock />{verdict ? 'пауза' : mss(left)}
+      </span>
+    </>
+  );
+
+  const endCtl = confirmEnd ? (
+    <span className="surv-end">
+      <span>Закончить серию?</span>
+      <button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={end}>Да, закончить</button>
+      <button type="button" className="btn btn-sm btn-ghost" onClick={() => setConfirmEnd(false)}>Нет</button>
+    </span>
+  ) : (
+    <button type="button" className="btn btn-sm btn-ghost surv-end-btn" disabled={busy} onClick={() => setConfirmEnd(true)}>
+      Закончить серию
+    </button>
+  );
+
+  const timeBar = !verdict ? (
+    <div className="surv-time" aria-hidden="true"><i style={{ width: `${pct}%` }} className={hurry ? 'hurry' : undefined} /></div>
+  ) : null;
+
+  const body = (
+    <>
+      <div className="qtext" dangerouslySetInnerHTML={{ __html: q.text }} />
+      {q.figure ? <div className="qfig" dangerouslySetInnerHTML={{ __html: q.figure }} /> : null}
+
+      <div className="qopts" role="radiogroup" aria-label="Варианты ответа">
+        {q.options.map((o, i) => {
+          let cls = 'qopt';
+          if (verdict) {
+            if (i === verdict.correct) cls += ' ok';
+            else if (i === chosen && !verdict.timedOut) cls += ' bad';
+            else cls += ' dim';
+          } else if (i === chosen) cls += ' on';
+          return (
+            <button key={i} type="button" role="radio" aria-checked={i === chosen} className={cls}
+              disabled={!!verdict} onClick={() => setChosen(i)}>
+              <span className="ql">{LETTERS[i]}</span>
+              <span className="qo">{o}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {verdict ? (
+        <div ref={box}>
+          <div className={`qverdict ${verdict.isCorrect ? 'ok' : 'bad'}`}>
+            {verdict.isCorrect
+              ? `Верно! Серия ${run.streak}.`
+              : `${verdict.timedOut ? 'Время вышло.' : 'Неверно.'} Правильный ответ — ${LETTERS[verdict.correct]}. ${run.alive ? `Жизней осталось: ${run.lives}.` : 'Жизни закончились.'}`}
+          </div>
+          <div className="qexp">
+            <b>Разбор</b>
+            <div dangerouslySetInnerHTML={{ __html: verdict.explanation }} />
+          </div>
+          <div className="qact end">
+            <span className="qhint">Enter — дальше</span>
+            <button type="button" className="btn btn-primary" onClick={next}>
+              {run.alive ? 'Следующая задача' : 'Итог серии'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="qact">
+          <span className="qhint">{chosen === null ? 'Выбери вариант ответа' : `Выбран вариант ${LETTERS[chosen]}`}</span>
+          <button type="button" className="btn btn-primary" disabled={chosen === null || busy} onClick={() => submit(false)}>
+            {busy ? 'Проверяю…' : 'Ответить'}
+          </button>
+        </div>
+      )}
+      {error ? <p className="qerr">{error}</p> : null}
+    </>
+  );
+
+  if (sheet) {
+    return (
+      <SheetOverlay
+        storageKey={PRACTICE_SHEETS}
+        sheetId={q.id}
+        title={<>Серия {run.streak}</>}
+        tag={q.topicLabel}
+        bar={<span className="scr-grow surv-dark">{stats}</span>}
+        actions={endCtl}
+        onClose={() => setSheet(false)}
+      >
+        {timeBar}
+        {body}
+      </SheetOverlay>
+    );
+  }
+
   return (
     <>
       <div className="surv-bar">
-        <span className="flame"><IFlame />{run.streak}</span>
-        <span className="lives" aria-label={`Жизней: ${run.lives}`}>
-          {[0, 1, 2].map((k) => <i key={k} className={k < run.lives ? 'on' : undefined}><IHeart /></i>)}
-        </span>
-        <span className={`surv-clock${hurry ? ' hurry' : ''}${verdict ? ' paused' : ''}`}
-          role="timer" aria-label={verdict ? 'Таймер на паузе' : `Осталось ${left} секунд`}>
-          <IClock />{verdict ? 'пауза' : mss(left)}
-        </span>
+        {stats}
         <span className="st">Рекорд: {Math.max(run.best, myBest)}</span>
-        {confirmEnd ? (
-          <span className="surv-end">
-            <span>Закончить серию?</span>
-            <button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={end}>Да, закончить</button>
-            <button type="button" className="btn btn-sm btn-ghost" onClick={() => setConfirmEnd(false)}>Нет</button>
-          </span>
-        ) : (
-          <button type="button" className="btn btn-sm btn-ghost surv-end-btn" disabled={busy} onClick={() => setConfirmEnd(true)}>
-            Закончить серию
-          </button>
-        )}
+        <span className="surv-right">
+          <SheetButton small open={sheet} onOpen={() => setSheet(true)} />
+          {endCtl}
+        </span>
       </div>
-      {!verdict ? (
-        <div className="surv-time" aria-hidden="true"><i style={{ width: `${pct}%` }} className={hurry ? 'hurry' : undefined} /></div>
-      ) : null}
+      {timeBar}
 
       <div className="qcard">
-        <div className="qtag">{q.topicLabel}</div>
-        <div className="qtext" dangerouslySetInnerHTML={{ __html: q.text }} />
-        {q.figure ? <div className="qfig" dangerouslySetInnerHTML={{ __html: q.figure }} /> : null}
-
-        <div className="qopts" role="radiogroup" aria-label="Варианты ответа">
-          {q.options.map((o, i) => {
-            let cls = 'qopt';
-            if (verdict) {
-              if (i === verdict.correct) cls += ' ok';
-              else if (i === chosen && !verdict.timedOut) cls += ' bad';
-              else cls += ' dim';
-            } else if (i === chosen) cls += ' on';
-            return (
-              <button key={i} type="button" role="radio" aria-checked={i === chosen} className={cls}
-                disabled={!!verdict} onClick={() => setChosen(i)}>
-                <span className="ql">{LETTERS[i]}</span>
-                <span className="qo">{o}</span>
-              </button>
-            );
-          })}
+        <div className="qhead">
+          <div className="qtag">{q.topicLabel}</div>
+          <SheetChip onOpen={() => setSheet(true)} />
         </div>
-
-        {verdict ? (
-          <div ref={box}>
-            <div className={`qverdict ${verdict.isCorrect ? 'ok' : 'bad'}`}>
-              {verdict.isCorrect
-                ? `Верно! Серия ${run.streak}.`
-                : `${verdict.timedOut ? 'Время вышло.' : 'Неверно.'} Правильный ответ — ${LETTERS[verdict.correct]}. ${run.alive ? `Жизней осталось: ${run.lives}.` : 'Жизни закончились.'}`}
-            </div>
-            <div className="qexp">
-              <b>Разбор</b>
-              <div dangerouslySetInnerHTML={{ __html: verdict.explanation }} />
-            </div>
-            <div className="qact end">
-              <span className="qhint">Enter — дальше</span>
-              <button type="button" className="btn btn-primary" onClick={next}>
-                {run.alive ? 'Следующая задача' : 'Итог серии'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="qact">
-            <span className="qhint">{chosen === null ? 'Выбери вариант ответа' : `Выбран вариант ${LETTERS[chosen]}`}</span>
-            <button type="button" className="btn btn-primary" disabled={chosen === null || busy} onClick={() => submit(false)}>
-              {busy ? 'Проверяю…' : 'Ответить'}
-            </button>
-          </div>
-        )}
-        {error ? <p className="qerr">{error}</p> : null}
+        {body}
       </div>
     </>
   );
