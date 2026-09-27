@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import {
   addEvent, addEvents, addScore, createStudent, deleteEvent, deleteEventBatch, deleteGroup, deleteScore,
-  deleteStudent, saveGroup, unbindStudent, updateStudent,
+  deleteStudent, saveGroup, setExamDate, unbindStudent, updateStudent,
   type AdminResult, type EventInput, type GroupInput, type StudentInput,
 } from '@/lib/admin-actions';
 import { SECTIONS, type Access, type Section } from '@/lib/access';
@@ -180,7 +180,7 @@ export default function AdminPanel({
   scores: AScore[];
   events: AEvent[];
 }) {
-  const [tab, setTab] = useState<'students' | 'group' | 'solo' | 'events'>('students');
+  const [tab, setTab] = useState<'students' | 'group' | 'solo' | 'events' | 'exam'>('students');
   const inGroups = groups.filter((g) => !isSolo(g));
   const solos = groups.filter(isSolo);
   const planned = events.filter((e) => e.batch).length;
@@ -200,9 +200,14 @@ export default function AdminPanel({
         <button type="button" role="tab" aria-selected={tab === 'events'} className={tab === 'events' ? 'on' : ''} onClick={() => setTab('events')}>
           Занятия и тесты{planned ? ` · ${planned}` : ''}
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'exam'} className={tab === 'exam' ? 'on' : ''} onClick={() => setTab('exam')}>
+          Дата экзамена
+        </button>
       </div>
       {tab === 'students' ? (
         <StudentsTab students={students} groups={groups} members={members} scores={scores} events={events} />
+      ) : tab === 'exam' ? (
+        <ExamTab students={students} groups={groups} members={members} />
       ) : tab === 'events' ? (
         <EventsTab students={students} groups={groups} members={members} events={events} />
       ) : (
@@ -652,14 +657,203 @@ function EventsBlock({ groupId, studentId, events }: { groupId?: number; student
   );
 }
 
-/* ================================ занятия и тесты для всех и выборочно */
-
 const AUDIENCE = [
   { key: 'all', label: 'Всем ученикам' },
   { key: 'groups', label: 'Группам' },
   { key: 'students', label: 'Отдельным ученикам' },
 ] as const;
 type Audience = (typeof AUDIENCE)[number]['key'];
+
+const toggle = <T,>(list: T[], x: T) => (list.includes(x) ? list.filter((y) => y !== x) : [...list, x]);
+
+/** Выбор адресатов: все, группы или отдельные ученики. Общий для экзамена и занятий. */
+function AudiencePicker({
+  audience, setAudience, groups, students, pickedGroups, setPickedGroups, pickedStudents, setPickedStudents, reach, allText, onChange,
+}: {
+  audience: Audience; setAudience: (a: Audience) => void;
+  groups: AGroup[]; students: AStudent[];
+  pickedGroups: number[]; setPickedGroups: (x: number[]) => void;
+  pickedStudents: string[]; setPickedStudents: (x: string[]) => void;
+  reach: number; allText: string; onChange: () => void;
+}) {
+  const [q, setQ] = useState('');
+  const found = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return students;
+    return students.filter((st) => [st.name, st.id, st.phone].some((x) => x && x.toLowerCase().includes(s)));
+  }, [students, q]);
+
+  return (
+    <div className="field">
+      <span className="field-label">Кому</span>
+      <div className="seg">
+        {AUDIENCE.map((a) => (
+          <button key={a.key} type="button" className={audience === a.key ? 'on' : ''} onClick={() => { onChange(); setAudience(a.key); }}>
+            {a.label}
+          </button>
+        ))}
+      </div>
+
+      {audience === 'groups' ? (
+        groups.length ? (
+          <div className="checks" style={{ marginTop: 10 }}>
+            {groups.map((g, i) => (
+              <label key={g.id} className="check">
+                <input type="checkbox" checked={pickedGroups.includes(g.id)} onChange={() => { onChange(); setPickedGroups(toggle(pickedGroups, g.id)); }} />
+                <span className="c-dot" style={{ background: colorOf(g, i) }} />
+                {groupTitle(g)}{isSolo(g) ? ' · инд.' : ''}
+              </label>
+            ))}
+          </div>
+        ) : <small>Групп пока нет.</small>
+      ) : null}
+
+      {audience === 'students' ? (
+        <div style={{ marginTop: 10 }}>
+          <input className="input" type="search" placeholder="Поиск ученика" value={q} onChange={(e) => setQ(e.target.value)} />
+          <div className="checks pick-list">
+            {found.map((st) => (
+              <label key={st.id} className="check">
+                <input type="checkbox" checked={pickedStudents.includes(st.id)} onChange={() => { onChange(); setPickedStudents(toggle(pickedStudents, st.id)); }} />
+                {st.name}
+              </label>
+            ))}
+            {!found.length ? <small>Никого не нашлось.</small> : null}
+          </div>
+        </div>
+      ) : null}
+
+      <small>{audience === 'all' ? allText : `Выбрано учеников: ${reach}.`}</small>
+    </div>
+  );
+}
+
+function reachOf(audience: Audience, students: AStudent[], members: AMember[], pickedGroups: number[], pickedStudents: string[]): number {
+  if (audience === 'all') return students.length;
+  if (audience === 'students') return pickedStudents.length;
+  return new Set(members.filter((m) => pickedGroups.includes(m.group_id)).map((m) => m.student_id)).size;
+}
+
+/* ============================================================ экзамен */
+
+function ExamTab({
+  students, groups, members,
+}: {
+  students: AStudent[]; groups: AGroup[]; members: AMember[];
+}) {
+  const act = useAction();
+  const [v, setV] = useState({ examName: '', examDate: '', examCity: '' });
+  const [audience, setAudience] = useState<Audience>('all');
+  const [pickedGroups, setPickedGroups] = useState<number[]>([]);
+  const [pickedStudents, setPickedStudents] = useState<string[]>([]);
+  const [okMsg, setOkMsg] = useState('');
+  const reach = reachOf(audience, students, members, pickedGroups, pickedStudents);
+
+  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setOkMsg('');
+    setV({ ...v, [k]: e.target.value });
+  };
+
+  // Сводка: у кого какая дата сейчас — ближайшие сверху, «без даты» в конце.
+  const byDate = useMemo(() => {
+    const map = new Map<string, AStudent[]>();
+    for (const st of students) {
+      const k = st.exam_date || '';
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(st);
+    }
+    return [...map.entries()].sort(([a], [b]) => (!a ? 1 : !b ? -1 : a.localeCompare(b)));
+  }, [students]);
+
+  const apply = (clear: boolean) => {
+    setOkMsg('');
+    const who = audience === 'all' ? 'всем ученикам' : `${reach} ${plural(reach, 'ученику', 'ученикам', 'ученикам')}`;
+    const what = clear ? 'Убрать дату экзамена' : `Поставить дату экзамена ${short(v.examDate)}`;
+    if (!confirm(`${what} ${who}?`)) return;
+    act.run(
+      () => setExamDate({
+        ...v, examDate: clear ? '' : v.examDate, audience,
+        groups: audience === 'groups' ? pickedGroups : undefined,
+        students: audience === 'students' ? pickedStudents : undefined,
+      }),
+      (r) => {
+        const n = (r as { count?: number }).count ?? 0;
+        setOkMsg(`${clear ? 'Дата убрана' : 'Дата обновлена'} · ${n} ${plural(n, 'ученик', 'ученика', 'учеников')}`);
+      },
+    );
+  };
+
+  return (
+    <div className="grid" style={{ gap: 16 }}>
+      <div className="card">
+        <div className="card-head">
+          <h2>Дата экзамена</h2>
+          <span className="note" style={{ margin: 0 }}>отсчёт на главной у ученика</span>
+        </div>
+
+        <form className="form" onSubmit={(e) => { e.preventDefault(); apply(false); }}>
+          <div className="fields-3">
+            <Field label="Дата экзамена">
+              <input className="input" type="date" required value={v.examDate} onChange={set('examDate')} />
+            </Field>
+            <Field label="Экзамен" hint="Пусто — не менять">
+              <input className="input" value={v.examName} onChange={set('examName')} placeholder="TR-YÖS 2027" />
+            </Field>
+            <Field label="Город / университет" hint="Пусто — не менять">
+              <input className="input" value={v.examCity} onChange={set('examCity')} placeholder="Стамбул" />
+            </Field>
+          </div>
+
+          <AudiencePicker
+            audience={audience} setAudience={setAudience} groups={groups} students={students}
+            pickedGroups={pickedGroups} setPickedGroups={setPickedGroups}
+            pickedStudents={pickedStudents} setPickedStudents={setPickedStudents}
+            reach={reach} allText={`Дата поменяется у всех учеников — сейчас их ${students.length}.`}
+            onChange={() => setOkMsg('')}
+          />
+
+          <div className="row" style={{ alignItems: 'center' }}>
+            <button className="btn btn-dark" disabled={act.pending || !v.examDate}>{act.pending ? 'Сохраняю…' : 'Поставить дату'}</button>
+            <button type="button" className="btn btn-ghost" disabled={act.pending} onClick={() => apply(true)}>Убрать дату</button>
+            {okMsg ? <p className="okmsg">{okMsg}</p> : null}
+            {act.error ? <p className="err">{act.error}</p> : null}
+          </div>
+        </form>
+      </div>
+
+      <div className="card">
+        <div className="card-head">
+          <h2>Сейчас у учеников</h2>
+          <span className="note" style={{ margin: 0 }}>одному ученику дату можно поменять в его карточке</span>
+        </div>
+        {students.length ? (
+          <div className="a-list">
+            {byDate.map(([date, list]) => (
+              <div key={date || 'none'} className="a-row">
+                <div className="a-row-head">
+                  <div className="grow">
+                    <b>{date ? short(date) : 'Без даты'}</b>
+                    <i>{list.map((s) => s.name).join(', ')}</i>
+                  </div>
+                  <span className={`pill${date ? '' : ' warn'}`}>{list.length} {plural(list.length, 'ученик', 'ученика', 'учеников')}</span>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
+                    setOkMsg('');
+                    setAudience('students');
+                    setPickedStudents(list.map((s) => s.id));
+                    setV({ ...v, examDate: date });
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}>Изменить</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : <p className="muted" style={{ margin: 0 }}>Учеников пока нет.</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ================================ занятия и тесты для всех и выборочно */
 
 /** Одно назначение: строки события, созданные разом (общий batch). */
 interface Plan { key: string; batch: string | null; head: AEvent; rows: AEvent[] }
@@ -689,7 +883,6 @@ function EventsTab({
   const [audience, setAudience] = useState<Audience>('all');
   const [pickedGroups, setPickedGroups] = useState<number[]>([]);
   const [pickedStudents, setPickedStudents] = useState<string[]>([]);
-  const [q, setQ] = useState('');
   const [okMsg, setOkMsg] = useState('');
 
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -697,19 +890,8 @@ function EventsTab({
     setV({ ...v, [k]: e.target.value });
   };
 
-  const found = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return students;
-    return students.filter((st) => [st.name, st.id, st.phone].some((x) => x && x.toLowerCase().includes(s)));
-  }, [students, q]);
-
   // сколько учеников затронет назначение — видно до отправки
-  const reach = useMemo(() => {
-    if (audience === 'all') return students.length;
-    if (audience === 'students') return pickedStudents.length;
-    const ids = new Set(members.filter((m) => pickedGroups.includes(m.group_id)).map((m) => m.student_id));
-    return ids.size;
-  }, [audience, students, members, pickedGroups, pickedStudents]);
+  const reach = reachOf(audience, students, members, pickedGroups, pickedStudents);
 
   const plans = useMemo(() => planList(events), [events]);
   const nameOfGroup = (id: number) => { const g = groups.find((x) => x.id === id); return g ? groupTitle(g) : `группа ${id}`; };
@@ -738,8 +920,6 @@ function EventsTab({
       setPickedStudents([]);
     });
   };
-
-  const toggle = <T,>(list: T[], x: T) => (list.includes(x) ? list.filter((y) => y !== x) : [...list, x]);
 
   return (
     <div className="grid" style={{ gap: 16 }}>
@@ -777,51 +957,13 @@ function EventsTab({
             <input className="input" value={v.link} onChange={set('link')} placeholder="https://meet.google.com/…" />
           </Field>
 
-          <div className="field">
-            <span className="field-label">Кому</span>
-            <div className="seg">
-              {AUDIENCE.map((a) => (
-                <button key={a.key} type="button" className={audience === a.key ? 'on' : ''} onClick={() => { setOkMsg(''); setAudience(a.key); }}>
-                  {a.label}
-                </button>
-              ))}
-            </div>
-
-            {audience === 'groups' ? (
-              groups.length ? (
-                <div className="checks" style={{ marginTop: 10 }}>
-                  {groups.map((g, i) => (
-                    <label key={g.id} className="check">
-                      <input type="checkbox" checked={pickedGroups.includes(g.id)} onChange={() => { setOkMsg(''); setPickedGroups(toggle(pickedGroups, g.id)); }} />
-                      <span className="c-dot" style={{ background: colorOf(g, i) }} />
-                      {groupTitle(g)}{isSolo(g) ? ' · инд.' : ''}
-                    </label>
-                  ))}
-                </div>
-              ) : <small>Групп пока нет.</small>
-            ) : null}
-
-            {audience === 'students' ? (
-              <div style={{ marginTop: 10 }}>
-                <input className="input" type="search" placeholder="Поиск ученика" value={q} onChange={(e) => setQ(e.target.value)} />
-                <div className="checks pick-list">
-                  {found.map((st) => (
-                    <label key={st.id} className="check">
-                      <input type="checkbox" checked={pickedStudents.includes(st.id)} onChange={() => { setOkMsg(''); setPickedStudents(toggle(pickedStudents, st.id)); }} />
-                      {st.name}
-                    </label>
-                  ))}
-                  {!found.length ? <small>Никого не нашлось.</small> : null}
-                </div>
-              </div>
-            ) : null}
-
-            <small>
-              {audience === 'all'
-                ? `Увидят все ученики с привязанным ID — сейчас их ${students.length}.`
-                : `Выбрано учеников: ${reach}.`}
-            </small>
-          </div>
+          <AudiencePicker
+            audience={audience} setAudience={setAudience} groups={groups} students={students}
+            pickedGroups={pickedGroups} setPickedGroups={setPickedGroups}
+            pickedStudents={pickedStudents} setPickedStudents={setPickedStudents}
+            reach={reach} allText={`Увидят все ученики с привязанным ID — сейчас их ${students.length}.`}
+            onChange={() => setOkMsg('')}
+          />
 
           <div className="row" style={{ alignItems: 'center' }}>
             <button className="btn btn-dark" disabled={act.pending}>{act.pending ? 'Назначаю…' : 'Назначить'}</button>
