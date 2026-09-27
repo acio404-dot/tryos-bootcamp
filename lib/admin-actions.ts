@@ -90,6 +90,55 @@ export async function updateStudent(id: string, input: StudentInput): Promise<Ad
   return { ok: true };
 }
 
+export interface ExamInput {
+  /** Пусто — название экзамена у учеников не меняется. */
+  examName?: string;
+  /** Пусто — дата экзамена убирается. */
+  examDate?: string;
+  /** Пусто — город у учеников не меняется. */
+  examCity?: string;
+  audience: 'all' | 'groups' | 'students';
+  groups?: number[];
+  students?: string[];
+}
+
+/**
+ * Меняет дату экзамена сразу многим ученикам: всем, выбранным группам или
+ * выбранным ученикам. Отсчёт до экзамена у них на главной обновится сразу.
+ */
+export async function setExamDate(input: ExamInput): Promise<AdminResult & { count?: number }> {
+  const err = await guard();
+  if (err) return { error: err };
+  const date = dateOrNull(input.examDate);
+  if (input.examDate && !date) return { error: 'Неверная дата' };
+  const name = clean(input.examName, 80);
+  const city = clean(input.examCity, 60);
+
+  let ids: string[] | null = null;
+  if (input.audience === 'groups') {
+    const gids = (input.groups || []).map(intOrNull).filter((x): x is number => x !== null);
+    if (!gids.length) return { error: 'Выбери хотя бы одну группу' };
+    const rows = await db<{ student_id: string }>`select distinct student_id from bc_members where group_id = any(${gids}::int[])`;
+    ids = rows.map((r) => r.student_id);
+    if (!ids.length) return { error: 'В выбранных группах нет учеников' };
+  } else if (input.audience === 'students') {
+    ids = (input.students || []).map((s) => clean(s, 40)).filter((x): x is string => Boolean(x));
+    if (!ids.length) return { error: 'Выбери хотя бы одного ученика' };
+  } else if (input.audience !== 'all') {
+    return { error: 'Выбери, кому менять дату' };
+  }
+
+  const rows = ids
+    ? await db<{ id: string }>`update bc_students set exam_date = ${date},
+        exam_name = coalesce(${name}, exam_name), exam_city = coalesce(${city}, exam_city)
+        where id = any(${ids}::text[]) returning id`
+    : await db<{ id: string }>`update bc_students set exam_date = ${date},
+        exam_name = coalesce(${name}, exam_name), exam_city = coalesce(${city}, exam_city)
+        returning id`;
+  revalidatePath('/', 'layout');
+  return { ok: true, count: rows.length };
+}
+
 /** Отвязать аккаунт от ID (например, ученик потерял доступ к аккаунту). */
 export async function unbindStudent(id: string): Promise<AdminResult> {
   const err = await guard();
