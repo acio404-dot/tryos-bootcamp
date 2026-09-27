@@ -4,6 +4,8 @@ import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { studentOfUser } from '@/lib/data';
 import { streaksOf } from '@/lib/streak';
+import { mockBatches } from '@/lib/mock';
+import { nowInTz } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Админка' };
@@ -32,7 +34,15 @@ export default async function Admin() {
        from bc_teachers t left join bc_users u on u.id = t.user_id order by t.name`,
   ]);
 
-  const streaks = await streaksOf(students.map((s: any) => s.user_id));
+  const [streaks, mocks, mockExams] = await Promise.all([
+    streaksOf(students.map((s: any) => s.user_id)),
+    mockBatches(),
+    // проведённые тестирования из расписания — чтобы внести по ним баллы
+    db<{ title: string; day: string; group_id: number | null }>`select title, group_id,
+        to_char(at at time zone ${process.env.BOOTCAMP_TZ || 'Asia/Tashkent'}, 'YYYY-MM-DD') as day
+      from bc_events where kind = 'exam' and at > now() - interval '180 days' and at < now() + interval '1 day'
+      order by at desc limit 80`,
+  ]);
   for (const s of students as any[]) s.streak = s.user_id ? streaks[s.user_id] || 0 : 0;
 
   return (
@@ -51,6 +61,9 @@ export default async function Admin() {
         scores={scores as any}
         events={events as any}
         teachers={teachers as any}
+        mocks={mocks}
+        mockExams={mockExams}
+        today={nowInTz().date}
       />
     </Shell>
   );

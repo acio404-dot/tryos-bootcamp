@@ -2,17 +2,24 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, useTransition } from 'react';
-import type { Group } from '@/lib/data';
+import type { Group, Slot } from '@/lib/data';
 import { DOW, dateShort, plural, whenRu } from '@/lib/format';
 import {
-  addTeacherEvent, addTeacherScore, deleteTeacherEvent, deleteTeacherScore, saveGroupLinks, setEventLink, setLessonInfo,
+  addStudentEvent, addTeacherEvent, addTeacherScore, deleteStudentEvent, deleteTeacherEvent, deleteTeacherMock, deleteTeacherScore,
+  saveGroupLinks, saveTeacherMock, saveTeacherSchedule, setEventLink, setLessonInfo, updateTeacherStudent,
   type TeacherResult,
 } from '@/lib/teacher-actions';
 import StreakBadge from './StreakBadge';
+import MockResults, { type MExam } from './MockResults';
+import type { MockBatch } from '@/lib/mock';
 
-export interface TStudent { id: string; name: string; group_id: number; streak: number }
+export interface TStudent {
+  id: string; name: string; group_id: number; streak: number; bound: boolean;
+  phone: string | null; note: string | null; exam_name: string | null; exam_date: string | null; exam_city: string | null;
+  target_score: number | null; last_score: number | null;
+}
 export interface TLesson { date: string; start: string; end: string; group_id: number; link: string | null; own: boolean; topic: string | null }
-export interface TEvent { id: number; group_id: number; kind: string; title: string; link: string | null; note: string | null; batch: string | null; day: string; time: string }
+export interface TEvent { id: number; group_id: number | null; student_id?: string | null; kind: string; title: string; link: string | null; note: string | null; batch: string | null; day: string; time: string }
 export interface TScore { id: number; student_id: string; student: string; title: string; value: number; max: number; date: string }
 
 const COLORS = ['#1E8F8A', '#2C7FB0', '#7A5AC8', '#C9791C', '#1F9D6B'];
@@ -59,40 +66,56 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-type Tab = 'lessons' | 'groups' | 'scores';
+type Tab = 'lessons' | 'groups' | 'students' | 'mocks' | 'scores';
 
 export default function TeachPanel({
-  groups, students, lessons, events, scores, today,
+  groups, students, lessons, events, scores, mocks, exams, today,
 }: {
-  groups: Group[]; students: TStudent[]; lessons: TLesson[]; events: TEvent[]; scores: TScore[]; today: string;
+  groups: Group[]; students: TStudent[]; lessons: TLesson[]; events: TEvent[]; scores: TScore[];
+  mocks: MockBatch[]; exams: MExam[]; today: string;
 }) {
   const [tab, setTab] = useState<Tab>('lessons');
-  const colorOf = (id: number) => {
+  // ученик, открытый во вкладке «Ученики» (по нажатию на имя в группе)
+  const [openStudent, setOpenStudent] = useState<string | null>(null);
+  const showStudent = (id: string) => { setOpenStudent(id); setTab('students'); window.scrollTo({ top: 0 }); };
+  const people = useMemo(() => {
+    const seen = new Set<string>();
+    return students.filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)));
+  }, [students]);
+  const nameOf = (id: string | null | undefined) => people.find((p) => p.id === id)?.name || '';
+  const colorOf = (id: number | null) => {
     const i = groups.findIndex((g) => g.id === id);
     return groups[i]?.color || COLORS[Math.max(0, i) % COLORS.length];
   };
-  const groupOf = (id: number) => groups.find((g) => g.id === id);
+  const groupOf = (id: number | null) => groups.find((g) => g.id === id);
 
   return (
     <div className="teach">
       <div className="tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'lessons'} className={tab === 'lessons' ? 'on' : ''} onClick={() => setTab('lessons')}>Занятия</button>
         <button type="button" role="tab" aria-selected={tab === 'groups'} className={tab === 'groups' ? 'on' : ''} onClick={() => setTab('groups')}>Мои группы · {groups.length}</button>
+        <button type="button" role="tab" aria-selected={tab === 'students'} className={tab === 'students' ? 'on' : ''} onClick={() => setTab('students')}>Ученики · {people.length}</button>
+        <button type="button" role="tab" aria-selected={tab === 'mocks'} className={tab === 'mocks' ? 'on' : ''} onClick={() => setTab('mocks')}>Баллы за пробники</button>
         <button type="button" role="tab" aria-selected={tab === 'scores'} className={tab === 'scores' ? 'on' : ''} onClick={() => setTab('scores')}>Оценки</button>
       </div>
 
       {tab === 'lessons' ? (
         <div className="grid" style={{ gap: 16 }}>
-          <Upcoming lessons={lessons} events={events} today={today} groupOf={groupOf} colorOf={colorOf} />
+          <Upcoming lessons={lessons} events={events} today={today} groupOf={groupOf} colorOf={colorOf} nameOf={nameOf} />
           <NewLesson groups={groups} today={today} colorOf={colorOf} />
         </div>
       ) : tab === 'groups' ? (
         <div className="t-groups">
           {groups.map((g) => (
             <GroupCard key={g.id} g={g} color={colorOf(g.id)} people={students.filter((s) => s.group_id === g.id)}
-              deadlines={events.filter((e) => e.group_id === g.id && e.kind === 'deadline')} />
+              deadlines={events.filter((e) => e.group_id === g.id && e.kind === 'deadline')} onStudent={showStudent} />
           ))}
         </div>
+      ) : tab === 'students' ? (
+        <StudentsTab groups={groups} students={students} people={people} events={events} today={today}
+          open={openStudent} setOpen={setOpenStudent} colorOf={colorOf} />
+      ) : tab === 'mocks' ? (
+        <MockResults groups={groups} students={students} batches={mocks} exams={exams} today={today} save={saveTeacherMock} remove={deleteTeacherMock} />
       ) : (
         <Scores groups={groups} students={students} scores={scores} today={today} />
       )}
@@ -107,9 +130,10 @@ type Row =
   | { type: 'event'; key: string; date: string; time: string; e: TEvent };
 
 function Upcoming({
-  lessons, events, today, groupOf, colorOf,
+  lessons, events, today, groupOf, colorOf, nameOf,
 }: {
-  lessons: TLesson[]; events: TEvent[]; today: string; groupOf: (id: number) => Group | undefined; colorOf: (id: number) => string;
+  lessons: TLesson[]; events: TEvent[]; today: string; groupOf: (id: number | null) => Group | undefined;
+  colorOf: (id: number | null) => string; nameOf: (id: string | null | undefined) => string;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const [all, setAll] = useState(false);
@@ -145,7 +169,7 @@ function Upcoming({
                     <b>{r.type === 'event' ? r.e.title : g ? title(g) : 'Группа'}</b>
                     <i>
                       {whenRu(today, r.date)}, {r.type === 'lesson' ? `${r.l.start}–${r.l.end}` : r.e.time}
-                      {r.type === 'event' ? ` · ${KIND_RU[r.e.kind] || 'занятие'} · ${g ? title(g) : ''}` : g?.kind === 'solo' ? ' · индивидуально' : ''}
+                      {r.type === 'event' ? ` · ${KIND_RU[r.e.kind] || 'занятие'} · ${g ? title(g) : nameOf(r.e.student_id) ? `лично: ${nameOf(r.e.student_id)}` : ''}` : g?.kind === 'solo' ? ' · индивидуально' : ''}
                       {r.type === 'lesson' && r.l.topic ? ` · ${r.l.topic}` : ''}
                     </i>
                     {link
@@ -232,7 +256,7 @@ function EventEditor({ e, onDone }: { e: TEvent; onDone: () => void }) {
       <div className="row" style={{ alignItems: 'center' }}>
         <button className="btn btn-dark btn-sm" disabled={act.pending}>{act.pending ? 'Сохраняю…' : 'Сохранить'}</button>
         <button type="button" className="btn btn-danger btn-sm" disabled={act.pending}
-          onClick={() => { if (confirm(`Отменить «${e.title}»? Ученики перестанут его видеть.`)) act.run(() => deleteTeacherEvent(e.id), onDone); }}>Отменить занятие</button>
+          onClick={() => { if (confirm(`Отменить «${e.title}»? Ученики перестанут его видеть.`)) act.run(() => (e.group_id ? deleteTeacherEvent(e.id) : deleteStudentEvent(e.id)), onDone); }}>Отменить занятие</button>
         {act.error ? <p className="err">{act.error}</p> : null}
       </div>
     </form>
@@ -331,7 +355,12 @@ function NewLesson({ groups, today, colorOf }: { groups: Group[]; today: string;
 
 /* ------------------------------------------------------------ группы */
 
-function GroupCard({ g, color, people, deadlines }: { g: Group; color: string; people: TStudent[]; deadlines: TEvent[] }) {
+function GroupCard({
+  g, color, people, deadlines, onStudent,
+}: {
+  g: Group; color: string; people: TStudent[]; deadlines: TEvent[]; onStudent: (id: string) => void;
+}) {
+  const [editSchedule, setEditSchedule] = useState(false);
   const act = useAction();
   const [v, setV] = useState({ link: g.link || '', chat: g.chat || '', materials: g.materials || '' });
   const [saved, setSaved] = useState(false);
@@ -345,16 +374,28 @@ function GroupCard({ g, color, people, deadlines }: { g: Group; color: string; p
           <b>{title(g)}</b>
           <i>{g.kind === 'solo' ? 'индивидуально · ' : ''}{scheduleText(g)}</i>
         </div>
-        <span className="pill">{g.kind === 'solo' ? people[0]?.name || 'ученик не выбран' : `${people.length} уч.`}</span>
+        <span className="pill">{`${people.length} уч.`}</span>
       </div>
 
-      {g.kind !== 'solo' ? (
-        people.length ? (
-          <ul className="t-people">
-            {people.map((p) => <li key={p.id}>{p.name}<StreakBadge n={p.streak} /></li>)}
-          </ul>
-        ) : <p className="muted" style={{ fontSize: 13.5 }}>В группе пока нет учеников — их добавляет администратор.</p>
-      ) : null}
+      {people.length ? (
+        <ul className="t-people">
+          {people.map((p) => (
+            <li key={p.id}>
+              <button type="button" onClick={() => onStudent(p.id)} title="Открыть карточку ученика">{p.name}<StreakBadge n={p.streak} /></button>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="muted" style={{ fontSize: 13.5 }}>{g.kind === 'solo' ? 'Ученик не выбран' : 'В группе пока нет учеников'} — их добавляет администратор.</p>}
+
+      <div className="t-sched">
+        <div className="t-sched-head">
+          <span><b>Расписание</b>{g.starts || g.ends ? <i> · {g.starts ? g.starts.split('-').reverse().join('.') : '…'} – {g.ends ? g.ends.split('-').reverse().join('.') : '…'}</i> : null}</span>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditSchedule(!editSchedule)} aria-expanded={editSchedule}>
+            {editSchedule ? 'Закрыть' : 'Изменить'}
+          </button>
+        </div>
+        {editSchedule ? <ScheduleEditor g={g} onDone={() => setEditSchedule(false)} /> : null}
+      </div>
 
       <form className="form" onSubmit={(e) => { e.preventDefault(); act.run(() => saveGroupLinks(g.id, v), () => setSaved(true)); }}>
         <Field label="Постоянная ссылка на урок" hint="Ученики увидят кнопку «Подключиться» перед каждым занятием">
@@ -462,5 +503,205 @@ function Scores({ groups, students, scores, today }: { groups: Group[]; students
         ) : <p className="muted" style={{ margin: 0 }}>Пока нет оценок.</p>}
       </div>
     </div>
+  );
+}
+
+/* ---------------------------------------------------------- расписание */
+
+const DAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+
+function ScheduleEditor({ g, onDone }: { g: Group; onDone: () => void }) {
+  const act = useAction();
+  const [slots, setSlots] = useState<Slot[]>(g.schedule?.length ? g.schedule.map((x) => ({ ...x, dow: Number(x.dow) })) : [{ dow: 1, start: '19:00', end: '20:30' }]);
+  const [v, setV] = useState({ starts: g.starts || '', ends: g.ends || '', total: g.total_lessons != null ? String(g.total_lessons) : '' });
+  const setSlot = (i: number, patch: Partial<Slot>) => setSlots(slots.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const add = () => {
+    const last = slots[slots.length - 1];
+    setSlots([...slots, last ? { dow: Math.min(7, last.dow + 2), start: last.start, end: last.end } : { dow: 1, start: '19:00', end: '20:30' }]);
+  };
+
+  return (
+    <form className="form t-edit t-edit-flat" onSubmit={(e) => {
+      e.preventDefault();
+      if (!confirm('Сохранить новое расписание? Ученики сразу увидят его в «Расписании».')) return;
+      act.run(() => saveTeacherSchedule(g.id, { schedule: slots, ...v }), onDone);
+    }}>
+      <div className="field">
+        <span className="field-label">Занятия по неделям</span>
+        <div className="grid" style={{ gap: 8 }}>
+          {slots.map((x, i) => (
+            <div className="slot" key={i}>
+              <select className="select" value={x.dow} onChange={(e) => setSlot(i, { dow: Number(e.target.value) })} aria-label="День недели">
+                {DAYS.map((d, k) => <option key={k} value={k + 1}>{d}</option>)}
+              </select>
+              <input className="input" type="time" value={x.start} onChange={(e) => setSlot(i, { start: e.target.value })} aria-label="Начало" />
+              <input className="input" type="time" value={x.end} onChange={(e) => setSlot(i, { end: e.target.value })} aria-label="Конец" />
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSlots(slots.filter((_, j) => j !== i))} aria-label="Убрать день">✕</button>
+            </div>
+          ))}
+        </div>
+        <div><button type="button" className="linklike" onClick={add} style={{ marginTop: 4 }}>+ Ещё день</button></div>
+        <small>Время — по часовому поясу школы. Разовое занятие лучше поставить во вкладке «Занятия».</small>
+      </div>
+      <div className="fields-3">
+        <Field label="Начало курса"><input className="input" type="date" value={v.starts} onChange={(e) => setV({ ...v, starts: e.target.value })} /></Field>
+        <Field label="Конец курса"><input className="input" type="date" value={v.ends} onChange={(e) => setV({ ...v, ends: e.target.value })} /></Field>
+        <Field label="Всего занятий"><input className="input" inputMode="numeric" value={v.total} onChange={(e) => setV({ ...v, total: e.target.value.replace(/\D/g, '') })} placeholder="48" /></Field>
+      </div>
+      <div className="row" style={{ alignItems: 'center' }}>
+        <button className="btn btn-dark btn-sm" disabled={act.pending}>{act.pending ? 'Сохраняю…' : 'Сохранить расписание'}</button>
+        {act.error ? <p className="err">{act.error}</p> : null}
+      </div>
+    </form>
+  );
+}
+
+/* ------------------------------------------------------------ ученики */
+
+function StudentsTab({
+  groups, students, people, events, today, open, setOpen, colorOf,
+}: {
+  groups: Group[]; students: TStudent[]; people: TStudent[]; events: TEvent[]; today: string;
+  open: string | null; setOpen: (id: string | null) => void; colorOf: (id: number | null) => string;
+}) {
+  const [q, setQ] = useState('');
+  const list = people.filter((p) => !q.trim() || p.name.toLowerCase().includes(q.trim().toLowerCase()));
+  const groupsOf = (id: string) => students.filter((s) => s.id === id).map((s) => groups.find((g) => g.id === s.group_id)).filter(Boolean) as Group[];
+
+  return (
+    <div className="card">
+      <div className="a-toolbar">
+        <p className="muted" style={{ margin: 0, flex: '1 1 260px' }}>
+          Все ученики твоих групп и индивидуальных занятий. Можно поменять данные, экзамен, цель и поставить личный срок.
+        </p>
+        {people.length > 8 ? <input className="input" type="search" placeholder="Поиск ученика" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 260 }} /> : null}
+      </div>
+      <div className="a-list" style={{ marginTop: 14 }}>
+        {list.map((p) => {
+          const gs = groupsOf(p.id);
+          const isOpen = open === p.id;
+          return (
+            <div className="a-row" key={p.id}>
+              <div className="a-row-head">
+                <div className="grow">
+                  <b className="who">{p.name}<StreakBadge n={p.streak} /></b>
+                  <i>
+                    {gs.map((g) => (g.kind === 'solo' ? `${g.course} (инд.)` : title(g))).join(', ')}
+                    {p.exam_date ? ` · экзамен ${p.exam_date.split('-').reverse().join('.')}` : ''}
+                  </i>
+                </div>
+                {p.last_score != null ? <span className="pill" title="Последний пробник">{p.last_score}{p.target_score ? ` / цель ${p.target_score}` : ''}</span> : null}
+                {p.bound ? null : <span className="pill warn" title="Ученик ещё не ввёл свой ID">не вошёл</span>}
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(isOpen ? null : p.id)} aria-expanded={isOpen}>
+                  {isOpen ? 'Свернуть' : 'Открыть'}
+                </button>
+              </div>
+              {isOpen ? (
+                <div className="a-row-body">
+                  <div className="a-split">
+                    <section>
+                      <h3 className="a-h">Данные ученика</h3>
+                      <StudentEditor p={p} />
+                    </section>
+                    <section>
+                      <h3 className="a-h">Личные сроки и занятия</h3>
+                      <StudentEvents p={p} events={events.filter((e) => e.student_id === p.id)} today={today} />
+                      <h3 className="a-h" style={{ marginTop: 22 }}>Группы</h3>
+                      <ul className="t-people">
+                        {gs.map((g) => (
+                          <li key={g.id}><span className="c-dot" style={{ background: colorOf(g.id) }} />{title(g)}{g.kind === 'solo' ? ' · инд.' : ''}</li>
+                        ))}
+                      </ul>
+                      <small className="muted">Перевести в другую группу или поменять доступ может администратор.</small>
+                    </section>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+        {!list.length ? <p className="muted" style={{ margin: 0 }}>Никого не нашлось.</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function StudentEditor({ p }: { p: TStudent }) {
+  const act = useAction();
+  const [saved, setSaved] = useState(false);
+  const [v, setV] = useState({
+    name: p.name, phone: p.phone || '', note: p.note || '',
+    examName: p.exam_name || '', examDate: p.exam_date || '', examCity: p.exam_city || '',
+    target: p.target_score != null ? String(p.target_score) : '',
+  });
+  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { setSaved(false); setV({ ...v, [k]: e.target.value }); };
+
+  return (
+    <form className="form" onSubmit={(e) => { e.preventDefault(); act.run(() => updateTeacherStudent(p.id, v), () => setSaved(true)); }}>
+      <div className="fields-2">
+        <Field label="Имя и фамилия"><input className="input" required value={v.name} onChange={set('name')} /></Field>
+        <Field label="Телефон или Telegram"><input className="input" value={v.phone} onChange={set('phone')} placeholder="+998 90 123 45 67" /></Field>
+      </div>
+      <div className="fields-3">
+        <Field label="Экзамен"><input className="input" value={v.examName} onChange={set('examName')} placeholder="TR-YÖS 2027" /></Field>
+        <Field label="Дата экзамена"><input className="input" type="date" value={v.examDate} onChange={set('examDate')} /></Field>
+        <Field label="Цель, баллов"><input className="input" inputMode="numeric" value={v.target} onChange={set('target')} placeholder="400" /></Field>
+      </div>
+      <Field label="Город / университет экзамена"><input className="input" value={v.examCity} onChange={set('examCity')} placeholder="Стамбул" /></Field>
+      <Field label="Заметка" hint="Видят учителя и админ, ученик — нет">
+        <textarea className="input" rows={2} value={v.note} onChange={set('note')} placeholder="Слабые темы, договорённости…" />
+      </Field>
+      <div className="row" style={{ alignItems: 'center' }}>
+        <button className="btn btn-dark btn-sm" disabled={act.pending}>{act.pending ? 'Сохраняю…' : 'Сохранить'}</button>
+        {saved ? <p className="okmsg">Сохранено</p> : null}
+        {act.error ? <p className="err">{act.error}</p> : null}
+      </div>
+    </form>
+  );
+}
+
+function StudentEvents({ p, events, today }: { p: TStudent; events: TEvent[]; today: string }) {
+  const act = useAction();
+  const blank = { kind: 'deadline', title: '', date: '', time: '', link: '' };
+  const [v, setV] = useState(blank);
+  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setV({ ...v, [k]: e.target.value });
+
+  return (
+    <>
+      {events.length ? (
+        <ul className="mini-list" style={{ marginTop: 0 }}>
+          {events.map((e) => (
+            <li key={e.id}>
+              <span className="who">
+                {e.title}<span className="muted"> · {KIND_RU[e.kind] || 'срок'} · {e.day.slice(8)}.{e.day.slice(5, 7)}{e.time !== '23:59' ? ` ${e.time}` : ''}</span>
+              </span>
+              <button type="button" className="linklike" disabled={act.pending}
+                onClick={() => { if (confirm(`Убрать «${e.title}»?`)) act.run(() => deleteStudentEvent(e.id)); }}>Убрать</button>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="muted" style={{ margin: '0 0 10px', fontSize: 13.5 }}>Личных сроков нет.</p>}
+      <form className="form" style={{ marginTop: 10 }} onSubmit={(e) => { e.preventDefault(); act.run(() => addStudentEvent(p.id, v), () => setV({ ...blank, kind: v.kind })); }}>
+        <div className="fields-2">
+          <Field label="Что">
+            <select className="select" value={v.kind} onChange={set('kind')}>
+              <option value="deadline">Срок сдачи</option>
+              <option value="lesson">Отдельное занятие</option>
+              <option value="exam">Тест</option>
+            </select>
+          </Field>
+          <Field label="Название"><input className="input" required value={v.title} onChange={set('title')} placeholder="Исправить ошибки пробника" /></Field>
+        </div>
+        <div className="fields-2">
+          <Field label="Дата"><input className="input" type="date" required min={today} value={v.date} onChange={set('date')} /></Field>
+          <Field label="Время" hint={v.kind === 'deadline' ? 'Пусто — до 23:59' : 'Пусто — 10:00'}><input className="input" type="time" value={v.time} onChange={set('time')} /></Field>
+        </div>
+        {v.kind !== 'deadline' ? <Field label="Ссылка"><LinkInput value={v.link} onChange={(s) => setV({ ...v, link: s })} /></Field> : null}
+        <div className="row" style={{ alignItems: 'center' }}>
+          <button className="btn btn-dark btn-sm" disabled={act.pending}>{act.pending ? 'Сохраняю…' : 'Поставить'}</button>
+          {act.error ? <p className="err">{act.error}</p> : null}
+        </div>
+      </form>
+    </>
   );
 }

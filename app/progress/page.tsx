@@ -15,7 +15,7 @@ export default async function Progress() {
   const user = await requireUser();
   const student = await studentOfUser(user.id);
   const [progress, scores] = await Promise.all([
-    progressOf(user.id),
+    progressOf(user.id, student?.id),
     student && can(student.access, 'scores') ? scoresOf(student.id) : Promise.resolve([]),
   ]);
   const exam = examOf(user, student);
@@ -46,8 +46,8 @@ export default async function Progress() {
                   {progress.tests.slice(0, 15).map((t, i) => (
                     <tr key={i}>
                       <td>{dateRu(t.at, false)}</td>
-                      <td>{t.title}</td>
-                      <td className="num hide-m">{t.correct} / {t.wrong}</td>
+                      <td>{t.title}{t.source === 'offline' ? <span className="off-tag" title={t.teacher ? `Балл внёс: ${t.teacher}` : 'Балл внесла школа'}>очно</span> : null}</td>
+                      <td className="num hide-m">{t.total ? `${t.correct} / ${t.wrong}` : '—'}</td>
                       <td className="num score">{t.score}</td>
                     </tr>
                   ))}

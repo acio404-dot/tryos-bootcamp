@@ -2,6 +2,8 @@
  * Проверка полей форм: общая для админки и кабинета учителя.
  */
 
+import type { Slot } from './data';
+
 export const clean = (s: unknown, n = 200) => String(s ?? '').trim().slice(0, n) || null;
 export const dateOrNull = (s: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) ? String(s) : null);
 export const intOrNull = (s: unknown) => {
@@ -41,4 +43,17 @@ export function scoreFields(input: { title?: string; value?: string; max?: strin
     return 'Балл и максимум — числа, максимум больше нуля';
   }
   return { title, value, max, date: dateOrNull(input.date) };
+}
+
+/** Расписание по неделям: день 1–7 и время начала и конца. */
+export function slotsOf(list: Slot[] | undefined): Slot[] | string {
+  const out: Slot[] = [];
+  for (const s of list || []) {
+    const dow = intOrNull(s.dow);
+    if (!dow || dow < 1 || dow > 7) continue;
+    if (!HHMM.test(s.start) || !HHMM.test(s.end)) return 'Время занятий — в формате 19:00';
+    if (s.end <= s.start) return 'Конец занятия должен быть позже начала';
+    out.push({ dow, start: s.start, end: s.end });
+  }
+  return out;
 }

@@ -14,12 +14,14 @@ import { useMemo, useState, useTransition } from 'react';
 import {
   addEvent, addEvents, addScore, createStudent, deleteEvent, deleteEventBatch, deleteGroup, deleteScore,
   deleteStudent, saveGroup, setExamDate, unbindStudent, updateStudent,
-  createTeacher, deleteTeacher, unbindTeacher, updateTeacher,
+  createTeacher, deleteTeacher, unbindTeacher, updateTeacher, saveMockResults, deleteMockResults,
   type AdminResult, type EventInput, type GroupInput, type StudentInput, type TeacherInput,
 } from '@/lib/admin-actions';
 import { SECTIONS, type Access, type Section } from '@/lib/access';
 import StreakBadge from './StreakBadge';
 import TeacherTag, { TeacherName } from './TeacherTag';
+import MockResults from './MockResults';
+import type { MockBatch } from '@/lib/mock';
 import { DOW, dateShort, plural } from '@/lib/format';
 
 /** '2027-04-11' → '11 апр 2027' (год — только если не текущий). */
@@ -183,7 +185,7 @@ const invite = (id: string, name: string) =>
 /* ============================================================ панель */
 
 export default function AdminPanel({
-  students, groups, members, scores, events, teachers,
+  students, groups, members, scores, events, teachers, mocks, mockExams, today,
 }: {
   students: AStudent[];
   groups: AGroup[];
@@ -191,8 +193,11 @@ export default function AdminPanel({
   scores: AScore[];
   events: AEvent[];
   teachers: ATeacher[];
+  mocks: MockBatch[];
+  mockExams: { title: string; day: string; group_id: number | null }[];
+  today: string;
 }) {
-  const [tab, setTab] = useState<'students' | 'teachers' | 'group' | 'solo' | 'events' | 'exam'>('students');
+  const [tab, setTab] = useState<'students' | 'teachers' | 'group' | 'solo' | 'events' | 'mocks' | 'exam'>('students');
   const inGroups = groups.filter((g) => !isSolo(g));
   const solos = groups.filter(isSolo);
   const planned = events.filter((e) => e.batch).length;
@@ -215,12 +220,29 @@ export default function AdminPanel({
         <button type="button" role="tab" aria-selected={tab === 'events'} className={tab === 'events' ? 'on' : ''} onClick={() => setTab('events')}>
           Занятия и тесты{planned ? ` · ${planned}` : ''}
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'mocks'} className={tab === 'mocks' ? 'on' : ''} onClick={() => setTab('mocks')}>
+          Баллы за пробники{mocks.length ? ` · ${mocks.length}` : ''}
+        </button>
         <button type="button" role="tab" aria-selected={tab === 'exam'} className={tab === 'exam' ? 'on' : ''} onClick={() => setTab('exam')}>
           Дата экзамена
         </button>
       </div>
       {tab === 'students' ? (
         <StudentsTab students={students} groups={groups} members={members} scores={scores} events={events} />
+      ) : tab === 'mocks' ? (
+        <MockResults
+          everyone
+          groups={groups}
+          students={[
+            ...members.map((m) => ({ id: m.student_id, name: students.find((s) => s.id === m.student_id)?.name || m.student_id, group_id: m.group_id })),
+            ...students.filter((s) => !members.some((m) => m.student_id === s.id)).map((s) => ({ id: s.id, name: s.name, group_id: null })),
+          ]}
+          batches={mocks}
+          exams={mockExams}
+          today={today}
+          save={saveMockResults}
+          remove={deleteMockResults}
+        />
       ) : tab === 'teachers' ? (
         <TeachersTab teachers={teachers} groups={groups} members={members} />
       ) : tab === 'exam' ? (
