@@ -154,6 +154,15 @@ function ensureSchema(): Promise<void> {
         total int not null default 0,
         created_at timestamptz not null default now()
       )`;
+      // Очные пробные тестирования: балл вносит учитель или админ. Строка
+      // привязана к ученику (student_id), поэтому видна ему, даже если он
+      // привязал ID позже. batch объединяет результаты одного тестирования.
+      await q`alter table bc_tests add column if not exists student_id text`;
+      await q`alter table bc_tests add column if not exists source text not null default 'online'`;
+      await q`alter table bc_tests add column if not exists batch text`;
+      await q`alter table bc_tests add column if not exists entered_by text`;
+      await q`alter table bc_tests add column if not exists teacher text`;
+      await q`create index if not exists bc_tests_student on bc_tests (student_id)`;
       // Пробник: вариант хранится на сервере, чтобы перезагрузка страницы
       // не обнуляла стомнутный тест.
       await q`create table if not exists bc_exam_runs (

@@ -215,15 +215,23 @@ export async function scoresOf(studentId: string): Promise<Score[]> {
 /* ------------------------------------------------------------ прогресс */
 
 export interface TopicStat { topic: string; label: string; section: string | null; total: number; ok: number }
-export interface TestRow { title: string; score: number; correct: number; wrong: number; blank: number; total: number; at: string }
+export interface TestRow {
+  title: string; score: number; correct: number; wrong: number; blank: number; total: number; at: string;
+  /** 'offline' — очное тестирование, балл внёс учитель или админ. */
+  source?: string;
+  teacher?: string | null;
+}
 
-export async function progressOf(userId: string) {
+/** studentId — чтобы подтянуть очные тестирования, внесённые на ученика. */
+export async function progressOf(userId: string, studentId?: string | null) {
   const [topics, tests, week, month, days] = await Promise.all([
     db<TopicStat>`select topic, max(coalesce(topic_label, topic)) as label, max(section) as section,
       count(*)::int as total, count(*) filter (where correct)::int as ok
       from bc_attempts where user_id = ${userId} group by topic order by max(section), count(*) desc`,
-    db<TestRow>`select title, score, correct, wrong, blank, total, to_char(created_at, 'YYYY-MM-DD') as at
-      from bc_tests where user_id = ${userId} order by created_at desc limit 50`,
+    db<TestRow>`select title, score, correct, wrong, blank, total, source, teacher,
+        to_char(created_at at time zone ${TZ}, 'YYYY-MM-DD') as at
+      from bc_tests where user_id = ${userId} or (${studentId || null}::text is not null and student_id = ${studentId || null})
+      order by created_at desc limit 50`,
     one<{ n: number }>`select count(*)::int as n from bc_attempts where user_id = ${userId} and created_at > now() - interval '7 days'`,
     one<{ n: number; r: number }>`select count(*)::int as n, count(*) filter (where correct)::int as r
       from bc_attempts where user_id = ${userId} and created_at > now() - interval '30 days'`,

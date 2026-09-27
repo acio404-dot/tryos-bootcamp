@@ -4,6 +4,8 @@ import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { studentOfUser } from '@/lib/data';
 import { streaksOf } from '@/lib/streak';
+import { mockBatches } from '@/lib/mock';
+import { nowInTz } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Админка' };
@@ -32,7 +34,7 @@ export default async function Admin() {
        from bc_teachers t left join bc_users u on u.id = t.user_id order by t.name`,
   ]);
 
-  const streaks = await streaksOf(students.map((s: any) => s.user_id));
+  const [streaks, mocks] = await Promise.all([streaksOf(students.map((s: any) => s.user_id)), mockBatches()]);
   for (const s of students as any[]) s.streak = s.user_id ? streaks[s.user_id] || 0 : 0;
 
   return (
@@ -51,6 +53,8 @@ export default async function Admin() {
         scores={scores as any}
         events={events as any}
         teachers={teachers as any}
+        mocks={mocks}
+        today={nowInTz().date}
       />
     </Shell>
   );

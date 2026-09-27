@@ -10,6 +10,7 @@ import { revalidatePath } from 'next/cache';
 import { db, one } from './db';
 import { currentUser, isAdmin } from './auth';
 import { HHMM, TZONE, clean, dateOrNull, eventFields, intOrNull, scoreFields, url } from './fields';
+import { deleteMock, mockFields, saveMock, type MockInput } from './mock';
 import { SECTIONS, makeStudentCode, makeTeacherCode, type Access, type Section, type Slot } from './data';
 
 export interface AdminResult { ok?: boolean; error?: string; id?: string }
@@ -415,6 +416,30 @@ export async function deleteEventBatch(batch: string): Promise<AdminResult> {
   const key = clean(batch, 64);
   if (!key) return { error: 'Нечего удалять' };
   await db`delete from bc_events where batch = ${key}`;
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+/* ------------------------------------------- очные пробные тестирования */
+
+/** Результаты очного пробника: балл ученикам — в историю тестов, на их главную. */
+export async function saveMockResults(input: MockInput): Promise<AdminResult & { count?: number }> {
+  const u = await currentUser();
+  if (!u || !isAdmin(u)) return { error: 'Нет доступа' };
+  const f = mockFields(input);
+  if (typeof f === 'string') return { error: f };
+  // при правке чужого (учительского) тестирования сохраняем, кто его вносил
+  const prev = f.batch ? await one<{ entered_by: string | null; teacher: string | null }>`select entered_by, teacher from bc_tests where batch = ${f.batch} limit 1` : null;
+  const count = await saveMock(f, prev?.entered_by || `admin:${u.id}`, prev ? prev.teacher : null);
+  revalidatePath('/', 'layout');
+  return { ok: true, count };
+}
+
+export async function deleteMockResults(batch: string): Promise<AdminResult> {
+  const err = await guard();
+  if (err) return { error: err };
+  const key = clean(batch, 64);
+  if (key) await deleteMock(key);
   revalidatePath('/', 'layout');
   return { ok: true };
 }

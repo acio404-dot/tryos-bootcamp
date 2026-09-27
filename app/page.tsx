@@ -25,7 +25,7 @@ export default async function Home() {
 
   const [groups, progress, scores, mistakes, bestStreak, streak] = await Promise.all([
     student && can(access, 'schedule') ? groupsOfStudent(student.id) : Promise.resolve([]),
-    progressOf(user.id),
+    progressOf(user.id, student?.id),
     student && can(access, 'scores') ? scoresOf(student.id) : Promise.resolve([]),
     mistakeCount(user.id),
     myBestSurvival(user.id),

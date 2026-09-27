@@ -5,10 +5,13 @@ import { useEffect, useMemo, useState, useTransition } from 'react';
 import type { Group } from '@/lib/data';
 import { DOW, dateShort, plural, whenRu } from '@/lib/format';
 import {
-  addTeacherEvent, addTeacherScore, deleteTeacherEvent, deleteTeacherScore, saveGroupLinks, setEventLink, setLessonInfo,
+  addTeacherEvent, addTeacherScore, deleteTeacherEvent, deleteTeacherMock, deleteTeacherScore, saveGroupLinks, saveTeacherMock,
+  setEventLink, setLessonInfo,
   type TeacherResult,
 } from '@/lib/teacher-actions';
 import StreakBadge from './StreakBadge';
+import MockResults, { type MExam } from './MockResults';
+import type { MockBatch } from '@/lib/mock';
 
 export interface TStudent { id: string; name: string; group_id: number; streak: number }
 export interface TLesson { date: string; start: string; end: string; group_id: number; link: string | null; own: boolean; topic: string | null }
@@ -59,12 +62,13 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-type Tab = 'lessons' | 'groups' | 'scores';
+type Tab = 'lessons' | 'groups' | 'mocks' | 'scores';
 
 export default function TeachPanel({
-  groups, students, lessons, events, scores, today,
+  groups, students, lessons, events, scores, mocks, exams, today,
 }: {
-  groups: Group[]; students: TStudent[]; lessons: TLesson[]; events: TEvent[]; scores: TScore[]; today: string;
+  groups: Group[]; students: TStudent[]; lessons: TLesson[]; events: TEvent[]; scores: TScore[];
+  mocks: MockBatch[]; exams: MExam[]; today: string;
 }) {
   const [tab, setTab] = useState<Tab>('lessons');
   const colorOf = (id: number) => {
@@ -78,6 +82,7 @@ export default function TeachPanel({
       <div className="tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'lessons'} className={tab === 'lessons' ? 'on' : ''} onClick={() => setTab('lessons')}>Занятия</button>
         <button type="button" role="tab" aria-selected={tab === 'groups'} className={tab === 'groups' ? 'on' : ''} onClick={() => setTab('groups')}>Мои группы · {groups.length}</button>
+        <button type="button" role="tab" aria-selected={tab === 'mocks'} className={tab === 'mocks' ? 'on' : ''} onClick={() => setTab('mocks')}>Баллы за пробники</button>
         <button type="button" role="tab" aria-selected={tab === 'scores'} className={tab === 'scores' ? 'on' : ''} onClick={() => setTab('scores')}>Оценки</button>
       </div>
 
@@ -93,6 +98,8 @@ export default function TeachPanel({
               deadlines={events.filter((e) => e.group_id === g.id && e.kind === 'deadline')} />
           ))}
         </div>
+      ) : tab === 'mocks' ? (
+        <MockResults groups={groups} students={students} batches={mocks} exams={exams} today={today} save={saveTeacherMock} remove={deleteTeacherMock} />
       ) : (
         <Scores groups={groups} students={students} scores={scores} today={today} />
       )}

@@ -10,6 +10,7 @@ import { revalidatePath } from 'next/cache';
 import { db, one } from './db';
 import { currentUser } from './auth';
 import { HHMM, TZONE, clean, dateOrNull, eventFields, scoreFields, url } from './fields';
+import { deleteMock, mockFields, saveMock, type MockInput } from './mock';
 
 export interface TeacherResult { ok?: boolean; error?: string }
 
@@ -131,5 +132,32 @@ export async function deleteTeacherScore(id: number): Promise<TeacherResult> {
   const row = await one`select 1 from bc_scores where id = ${id} and teacher_id = ${t.id}`;
   if (!row) return { error: 'Удалить можно только свои оценки' };
   await db`delete from bc_scores where id = ${id}`;
+  return done();
+}
+
+/** Результаты очного пробника для учеников своих групп. */
+export async function saveTeacherMock(input: MockInput): Promise<TeacherResult & { count?: number }> {
+  const t = await me();
+  if (!t) return { error: 'Нет доступа: войди как учитель' };
+  const f = mockFields(input);
+  if (typeof f === 'string') return { error: f };
+  const ids = f.rows.map((r) => r.studentId);
+  const mine = await db<{ student_id: string }>`select distinct m.student_id from bc_members m join bc_groups g on g.id = m.group_id
+    where g.teacher_id = ${t.id} and m.student_id = any(${ids}::text[])`;
+  if (mine.length !== new Set(ids).size) return { error: 'Можно вносить баллы только своим ученикам' };
+  // править можно только своё тестирование
+  if (f.batch && (await one`select 1 from bc_tests where batch = ${f.batch} and (entered_by is distinct from ${t.id})`)) {
+    return { error: 'Это тестирование вносил другой человек' };
+  }
+  const count = await saveMock(f, t.id, t.name);
+  revalidatePath('/', 'layout');
+  return { ok: true, count };
+}
+
+export async function deleteTeacherMock(batch: string): Promise<TeacherResult> {
+  const t = await me();
+  if (!t) return { error: 'Нет доступа: войди как учитель' };
+  const n = await deleteMock(String(batch || '').slice(0, 64), t.id);
+  if (!n) return { error: 'Удалить можно только свои тестирования' };
   return done();
 }

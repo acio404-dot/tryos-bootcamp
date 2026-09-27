@@ -9,6 +9,7 @@ import {
 } from '@/lib/data';
 import { plural } from '@/lib/format';
 import { streaksOf } from '@/lib/streak';
+import { mockBatches } from '@/lib/mock';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Кабинет учителя' };
@@ -34,7 +35,7 @@ export default async function Teach() {
   const ids = groups.map((g) => g.id);
   const now = nowInTz();
 
-  const [students, events, scores] = await Promise.all([
+  const [students, events, scores, mocks, exams] = await Promise.all([
     db<TStudent & { user_id: string | null }>`select s.id, s.name, s.user_id, m.group_id from bc_members m
       join bc_students s on s.id = m.student_id where m.group_id = any(${ids}::int[]) order by s.name`,
     db<TEvent>`select id, group_id, kind, title, link, note, batch,
@@ -44,6 +45,11 @@ export default async function Teach() {
         to_char(sc.date, 'YYYY-MM-DD') as date
       from bc_scores sc join bc_students s on s.id = sc.student_id
       where sc.teacher_id = ${teacher.id} order by sc.date desc, sc.id desc limit 40`,
+    mockBatches(teacher.id),
+    // прошедшие тестирования из расписания — чтобы внести по ним баллы в один клик
+    db<{ title: string; day: string; group_id: number }>`select title, group_id, to_char(at at time zone ${TZ}, 'YYYY-MM-DD') as day
+      from bc_events where kind = 'exam' and group_id = any(${ids}::int[]) and at > now() - interval '45 days' and at < now() + interval '1 day'
+      order by at desc limit 20`,
   ]);
   const streaks = await streaksOf(students.map((s) => s.user_id || ''));
   const people: TStudent[] = students.map((s) => ({ id: s.id, name: s.name, group_id: s.group_id, streak: s.user_id ? streaks[s.user_id] || 0 : 0 }));
@@ -76,7 +82,7 @@ export default async function Teach() {
         </div>
       </div>
       {groups.length ? (
-        <TeachPanel groups={groups} students={people} lessons={lessons} events={events} scores={scores} today={now.date} />
+        <TeachPanel groups={groups} students={people} lessons={lessons} events={events} scores={scores} mocks={mocks} exams={exams} today={now.date} />
       ) : (
         <div className="card empty-card">
           <h2>Групп пока нет</h2>

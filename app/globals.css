@@ -922,3 +922,18 @@ button{font:inherit;cursor:pointer}
   .t-edit{margin-left:0}
   .t-groups{grid-template-columns:1fr}
 }
+
+/* ------------------------------------ баллы за очные пробники */
+.mk-table{display:grid;gap:4px;margin-top:6px}
+.mk-row{display:grid;grid-template-columns:minmax(0,1fr) 96px 76px 76px;gap:8px;align-items:center;padding:4px 8px;border-radius:10px}
+.mk-row:nth-child(even):not(.mk-head){background:var(--paper)}
+.mk-head{font-size:11.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.mk-name{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mk-row .input{padding:8px 10px;text-align:center;font-weight:800}
+.mk-row .input.bad{border-color:var(--red);color:var(--red)}
+.mk-row .mk-in2{font-weight:600}
+.off-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:rgba(122,90,200,.13);color:#5B3FA8;font-size:10.5px;font-weight:800;vertical-align:middle}
+@media (max-width:600px){
+  .mk-row{grid-template-columns:minmax(0,1fr) 84px}
+  .mk-opt{display:none}
+}
