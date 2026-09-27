@@ -16,7 +16,7 @@ export interface Answered extends Verdict {
  * тренажёре, работе над ошибками и режиме выживания.
  */
 export default function QuestionCard({
-  q, mode, head, footer, saved = null, onResult, onNext, disabled = false,
+  q, mode, head, footer, saved = null, onResult, onNext, disabled = false, lettersOff = false,
 }: {
   q: PublicQuestion;
   /** Куда записать попытку: practice | mistakes | survival. */
@@ -27,6 +27,8 @@ export default function QuestionCard({
   onResult?: (a: Answered) => void;
   onNext?: () => void;
   disabled?: boolean;
+  /** На листе буквы переключают инструменты рисования — ответ выбирается цифрами. */
+  lettersOff?: boolean;
 }) {
   const [chosen, setChosen] = useState<number | null>(saved ? saved.chosen : null);
   const [verdict, setVerdict] = useState<Verdict | null>(saved);
@@ -88,13 +90,13 @@ export default function QuestionCard({
       if (verdict) return;
       const k = e.key.toUpperCase();
       const byDigit = '12345'.indexOf(k);
-      const byLetter = LETTERS.indexOf(k);
+      const byLetter = lettersOff ? -1 : LETTERS.indexOf(k);
       const i = byDigit >= 0 ? byDigit : byLetter;
       if (i >= 0 && i < q.options.length) setChosen(i);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [verdict, chosen, onNext, q.options.length]);
+  }, [verdict, chosen, onNext, q.options.length, lettersOff]);
 
   return (
     <div className="qcard">

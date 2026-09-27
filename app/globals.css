@@ -578,8 +578,8 @@ button{font:inherit;cursor:pointer}
 @media (prefers-reduced-motion:reduce){.scr-min svg{transition:none}}
 
 /* ---------- кнопка «Решать на листе» и подсказка ---------- */
-.exam-bar .sheet-btn{background:linear-gradient(135deg,rgba(95,227,214,.26),rgba(79,182,232,.18));border-color:rgba(60,200,192,.6);color:var(--ink)}
-.exam-bar .sheet-btn:hover{background:linear-gradient(135deg,rgba(95,227,214,.4),rgba(79,182,232,.26));border-color:var(--teal)}
+.sheet-btn{background:linear-gradient(135deg,rgba(95,227,214,.26),rgba(79,182,232,.18));border-color:rgba(60,200,192,.6);color:var(--ink)}
+.sheet-btn:hover{background:linear-gradient(135deg,rgba(95,227,214,.4),rgba(79,182,232,.26));border-color:var(--teal)}
 .sheet-new{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:var(--teal-deep);color:#fff;border-radius:999px;padding:3px 7px;line-height:1}
 .sheet-anchor{position:relative;display:inline-flex}
 .sheet-intro{position:absolute;top:calc(100% + 14px);right:0;z-index:6;display:flex;gap:14px;align-items:flex-start;width:430px;padding:16px;border-radius:18px;background:var(--navy-900);color:#fff;box-shadow:0 24px 50px -20px rgba(5,16,32,.6)}
@@ -705,7 +705,7 @@ button{font:inherit;cursor:pointer}
 .surv-clock.hurry{color:var(--red)}
 .surv-clock.hurry svg{color:var(--red);animation:pulse 1s infinite}
 .surv-clock.paused{font-size:14px;color:var(--muted);font-family:var(--font);font-weight:800}
-.surv-bar .surv-end-btn,.surv-bar .surv-end{margin-left:auto}
+.surv-right{margin-left:auto;display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
 .surv-end{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:800;font-size:13px}
 .surv-time{height:6px;margin:-8px 4px 14px;border-radius:999px;background:rgba(11,22,38,.08);overflow:hidden}
 .surv-time i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--teal),var(--teal-2));transition:width .25s linear}
@@ -719,3 +719,32 @@ button{font:inherit;cursor:pointer}
 .st.lock-st{display:inline-flex;align-items:center;gap:4px;color:var(--muted)}
 .st.lock-st svg{width:12px;height:12px}
 .mode-foot em svg{width:13px;height:13px;vertical-align:-2px;margin-right:2px}
+
+/* ---------- «Решать на листе» во всех режимах ---------- */
+.scr-grow{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.scr-body .qcard{padding:0;border:0;box-shadow:none;background:none;border-radius:0}
+.scr-body .qverdict{margin-top:12px}
+.scr-body .qexp{margin-top:10px;padding:12px 14px;font-size:14px}
+.scr-body .qact{margin-top:14px}
+.scr-body .surv-time{margin:0 0 12px}
+.surv-dark .flame{color:#FF8A80}
+.surv-dark .surv-clock{color:#fff}
+.surv-dark .surv-clock svg{color:#BACBDF}
+.surv-dark .surv-clock.hurry{color:#FF8A80}
+.surv-dark .lives i{color:rgba(255,255,255,.2)}
+.surv-dark .lives i.on{color:#FF6B63}
+.scr-act .surv-end{color:#fff}
+.scr-act .btn-ghost,.scr-act .surv-end-btn{background:transparent;border-color:rgba(255,255,255,.22);color:#fff}
+.scr-act .btn-danger{background:#fff}
+.series-sheet{display:inline-flex}
+@media (max-width:640px){
+  .scr-act .surv-end > span:first-child{display:none}
+}
+/* на листе варианты узкие: подписи «правильный / твой ответ» только для экранного диктора, цвет и так показывает */
+.scr-body .qopt{position:relative}
+.scr-body .qmark{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.surv-dark{flex-wrap:nowrap}
+@media (max-width:640px){
+  .scr-bar{flex-wrap:wrap;row-gap:8px}
+  .scr-bar .scr-act{margin-left:auto}
+}
