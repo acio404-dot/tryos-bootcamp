@@ -778,7 +778,7 @@ button{font:inherit;cursor:pointer}
 .mm{display:none}
 @media (max-width:900px){
   /* нижняя панель: пять вкладок, «Меню» — кнопка */
-  .tabbar{grid-template-columns:repeat(5,1fr) !important;padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+  .tabbar{grid-template-columns:none !important;grid-auto-flow:column;grid-auto-columns:1fr;padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
   .tabbar a,.tabbar button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;border:0;border-radius:12px;background:none;font:inherit;font-size:11px;font-weight:700;color:#8FA6BF;cursor:pointer}
   .tabbar a.on,.tabbar button.on{color:var(--teal-2);background:rgba(60,200,192,.12)}
   .tabbar svg{width:21px;height:21px}
@@ -889,3 +889,36 @@ button{font:inherit;cursor:pointer}
   .legend{gap:10px;font-size:12.5px}
 }
 @media (prefers-reduced-motion:reduce){.mm,.mm-sheet{animation:none}}
+
+/* ------------------------------------------------ учитель */
+.t-tag{display:inline-flex;align-items:center;margin-left:6px;padding:2px 7px;border-radius:999px;background:rgba(122,90,200,.13);color:#5B3FA8;font-size:10.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;vertical-align:middle;line-height:1.5;white-space:nowrap}
+.side .t-tag,.mm-me .t-tag{background:rgba(180,160,255,.18);color:#D5C8FF}
+.t-more{margin-top:10px}
+.side .me-name .t-tag{display:table;margin:4px 0 0}
+.t-name{display:inline-flex;align-items:center;flex-wrap:wrap}
+.t-me{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-top:6px}
+.t-me .t-tag{margin-left:0}
+.t-lessons li{display:block;padding:10px}
+.t-lessons li.on{background:var(--paper)}
+.t-row{display:flex;align-items:flex-start;gap:12px}
+.t-row .btn{flex:0 0 auto;align-self:center}
+.t-link{display:inline-block;margin-top:3px;font-size:12.5px;font-weight:700;color:var(--teal-deep);word-break:break-all}
+.t-nolink{display:inline-block;margin-top:4px;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:rgba(201,121,28,.14);color:#94550F}
+.t-edit{margin:12px 0 4px 64px;padding:14px;border-radius:14px;background:#fff;border:1px solid var(--line)}
+.t-linkin{display:flex;gap:8px;align-items:center}
+.t-linkin .input{flex:1 1 auto;min-width:0}
+.t-warn{margin:0 0 12px;padding:10px 12px;border-radius:12px;background:rgba(201,121,28,.12);color:#94550F;font-size:13.5px;font-weight:700}
+.t-quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.t-quick button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800;color:var(--ink-2)}
+.t-quick button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.t-groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.t-group-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.t-group-head .grow{flex:1 1 auto;min-width:0}
+.t-group-head b{display:block}
+.t-group-head i{display:block;font-style:normal;font-size:12.5px;color:var(--muted)}
+.t-people{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px;padding:0;list-style:none}
+.t-people li{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:999px;background:var(--paper);font-size:13px;font-weight:700}
+@media (max-width:900px){
+  .t-edit{margin-left:0}
+  .t-groups{grid-template-columns:1fr}
+}

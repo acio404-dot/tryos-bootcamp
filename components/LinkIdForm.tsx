@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { linkStudentId } from '@/lib/actions';
 
-/* Привязка ID ученика: после неё открываются курсы, расписание и баллы. */
+/* Привязка ID ученика (курсы, расписание, баллы) или ID учителя (TZT-…, кабинет учителя). */
 export default function LinkIdForm({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
   const [code, setCode] = useState('');
@@ -17,6 +17,7 @@ export default function LinkIdForm({ compact = false }: { compact?: boolean }) {
     start(async () => {
       const r = await linkStudentId(code);
       if (r.error) setError(r.error);
+      else if (/^\s*TZT/i.test(code)) router.push('/teach');
       else router.refresh();
     });
   };

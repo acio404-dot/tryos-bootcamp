@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import Shell from '@/components/Shell';
+import { TeacherName } from '@/components/TeacherTag';
 import LinkIdForm from '@/components/LinkIdForm';
 import { requireUser } from '@/lib/auth';
 import {
-  TZ, addDays, can, dowOfIso, eventsOf, groupsOfStudent, nowInTz, studentOfUser, upcomingLessons,
+  TZ, addDays, can, dowOfIso, eventsOf, groupsOfStudent, nowInTz, studentOfUser, upcomingLessons, withLessonInfo,
 } from '@/lib/data';
 import { DOW, dateRu, dateShort, whenRu } from '@/lib/format';
 
@@ -38,13 +39,14 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
     ? await eventsOf(student!.id, groups.map((g) => g.id), new Date().toISOString(), new Date(Date.now() + 14 * 86_400_000).toISOString())
     : [];
   const upcoming = [
-    ...upcomingLessons(groups, 14, 8).map((l) => ({
+    ...(await withLessonInfo(upcomingLessons(groups, 14, 8))).map((l) => ({
       key: `l-${l.date}-${l.group.id}-${l.start}`,
       date: l.date,
       time: l.start,
       title: `${l.group.course}${l.group.name ? ` · ${l.group.name}` : ''}`,
-      sub: `${whenRu(now.date, l.date)}, ${l.start}–${l.end}${l.group.kind === 'solo' ? ' · индивидуально' : ''}${l.group.teacher ? ` · ${l.group.teacher}` : ''}`,
-      link: l.group.link,
+      sub: `${whenRu(now.date, l.date)}, ${l.start}–${l.end}${l.group.kind === 'solo' ? ' · индивидуально' : ''}${l.topic ? ` · ${l.topic}` : ''}`,
+      teacher: l.group.teacher,
+      link: l.link,
     })),
     ...soon.filter((e) => e.kind !== 'deadline').map((e) => ({
       key: `e-${e.id}`,
@@ -52,6 +54,7 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
       time: e.time,
       title: e.title,
       sub: `${whenRu(now.date, e.day)}, ${e.time} · ${e.kind === 'exam' ? 'тестирование' : 'доп. занятие'}${e.note ? ` · ${e.note}` : ''}`,
+      teacher: null as string | null,
       link: e.link,
     })),
   ].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).slice(0, 8);
@@ -71,7 +74,7 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
           html: (
             <div className="ev tr" style={{ borderColor: color(g.id), background: `${color(g.id)}1a` }}>
               <b>{s.start}–{s.end}</b>{g.course}
-              <i>{g.kind === 'solo' ? `индивидуально${g.teacher ? ` · ${g.teacher}` : ''}` : g.name || g.teacher || ''}</i>
+              <i>{g.kind === 'solo' ? 'индивидуально' : g.name}{g.teacher ? <>{g.kind === 'solo' || g.name ? ' · ' : ''}{g.teacher}</> : null}</i>
             </div>
           ),
         });
@@ -143,7 +146,7 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
                 {upcoming.map((l) => (
                   <li key={l.key}>
                     <span className="date-box"><b>{dateShort(l.date).day}</b><span>{dateShort(l.date).mon}</span></span>
-                    <span className="txt"><b>{l.title}</b><i>{l.sub}</i></span>
+                    <span className="txt"><b>{l.title}</b><i>{l.sub}{l.teacher ? <> · <TeacherName name={l.teacher} /></> : null}</i></span>
                     {l.link ? <a className="go" href={l.link} target="_blank" rel="noopener noreferrer">Ссылка →</a> : null}
                   </li>
                 ))}

@@ -23,3 +23,4 @@ export const IMedal = () => (<svg {...S}><circle cx="12" cy="14" r="6" /><path d
 export const ISigma = () => (<svg {...S}><path d="M17 5H7l5 7-5 7h10" /></svg>);
 export const IBrain = () => (<svg {...S}><path d="M9.5 4A2.5 2.5 0 0 0 7 6.5 2.5 2.5 0 0 0 5 9a2.5 2.5 0 0 0 1 2 2.5 2.5 0 0 0 1 4.6A2.5 2.5 0 0 0 9.5 20H12V4z" /><path d="M14.5 4A2.5 2.5 0 0 1 17 6.5 2.5 2.5 0 0 1 19 9a2.5 2.5 0 0 1-1 2 2.5 2.5 0 0 1-1 4.6A2.5 2.5 0 0 1 14.5 20H12" /></svg>);
 export const ILogout = () => (<svg {...S}><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="m10 17-5-5 5-5" /><path d="M5 12h11" /></svg>);
+export const IUsers = () => (<svg {...S}><circle cx="9" cy="8" r="3.2" /><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" /><path d="M16 4.8a3.2 3.2 0 0 1 0 6.3M18 14.8c1.8.7 3 2.5 3 5.2" /></svg>);

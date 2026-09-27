@@ -9,7 +9,8 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { db, one } from './db';
 import { currentUser, isAdmin } from './auth';
-import { SECTIONS, makeStudentCode, type Access, type Section, type Slot } from './data';
+import { HHMM, TZONE, clean, dateOrNull, eventFields, intOrNull, scoreFields, url } from './fields';
+import { SECTIONS, makeStudentCode, makeTeacherCode, type Access, type Section, type Slot } from './data';
 
 export interface AdminResult { ok?: boolean; error?: string; id?: string }
 
@@ -18,12 +19,6 @@ async function guard(): Promise<string | null> {
   return u && isAdmin(u) ? null : 'Нет доступа';
 }
 
-const clean = (s: unknown, n = 200) => String(s ?? '').trim().slice(0, n) || null;
-const dateOrNull = (s: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) ? String(s) : null);
-const intOrNull = (s: unknown) => {
-  const n = parseInt(String(s ?? ''), 10);
-  return Number.isFinite(n) ? n : null;
-};
 
 function accessOf(input: any): Access {
   if (input?.level !== 'partial') return { level: 'full' };
@@ -172,13 +167,10 @@ export async function deleteStudent(id: string): Promise<AdminResult> {
 export async function addScore(studentId: string, input: { title: string; value: string; max: string; teacher?: string; date?: string }): Promise<AdminResult> {
   const err = await guard();
   if (err) return { error: err };
-  const title = clean(input.title, 120);
-  const value = Number(String(input.value).replace(',', '.'));
-  const max = Number(String(input.max).replace(',', '.'));
-  if (!title) return { error: 'Укажи, за что балл' };
-  if (!Number.isFinite(value) || !Number.isFinite(max) || max <= 0) return { error: 'Балл и максимум — числа, максимум больше нуля' };
+  const f = scoreFields(input);
+  if (typeof f === 'string') return { error: f };
   await db`insert into bc_scores (student_id, title, value, max, teacher, date)
-    values (${studentId}, ${title}, ${value}, ${max}, ${clean(input.teacher, 80)}, coalesce(${dateOrNull(input.date)}::date, current_date))`;
+    values (${studentId}, ${f.title}, ${f.value}, ${f.max}, ${clean(input.teacher, 80)}, coalesce(${f.date}::date, current_date))`;
   revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -201,6 +193,8 @@ export interface GroupInput {
   course: string;
   name?: string;
   teacher?: string;
+  /** Учитель из списка. Если задан, имя в teacher берётся из его карточки. */
+  teacherId?: string | null;
   schedule?: Slot[];
   starts?: string;
   ends?: string;
@@ -210,8 +204,6 @@ export interface GroupInput {
   materials?: string;
   color?: string;
 }
-
-const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function slotsOf(list: Slot[] | undefined): Slot[] | string {
   const out: Slot[] = [];
@@ -224,11 +216,6 @@ function slotsOf(list: Slot[] | undefined): Slot[] | string {
   }
   return out;
 }
-
-const url = (s: unknown) => {
-  const v = clean(s, 400);
-  return v && /^https?:\/\//i.test(v) ? v : v ? `https://${v}` : null;
-};
 
 export async function saveGroup(id: number | null, input: GroupInput): Promise<AdminResult> {
   const err = await guard();
@@ -243,9 +230,13 @@ export async function saveGroup(id: number | null, input: GroupInput): Promise<A
   }
   const slots = slotsOf(input.schedule);
   if (typeof slots === 'string') return { error: slots };
+  const teacherId = clean(input.teacherId, 40);
+  const tch = teacherId ? await one<{ name: string }>`select name from bc_teachers where id = ${teacherId}` : null;
+  if (teacherId && !tch) return { error: 'Такого учителя нет' };
   const vals = {
     name: clean(input.name, 60) || '',
-    teacher: clean(input.teacher, 120),
+    teacher: tch ? tch.name : clean(input.teacher, 120),
+    teacherId: tch ? teacherId : null,
     schedule: JSON.stringify(slots),
     starts: dateOrNull(input.starts),
     ends: dateOrNull(input.ends),
@@ -257,12 +248,12 @@ export async function saveGroup(id: number | null, input: GroupInput): Promise<A
   };
   let gid = id;
   if (gid) {
-    await db`update bc_groups set kind = ${kind}, course = ${course}, name = ${vals.name}, teacher = ${vals.teacher}, schedule = ${vals.schedule}::jsonb,
+    await db`update bc_groups set kind = ${kind}, course = ${course}, name = ${vals.name}, teacher = ${vals.teacher}, teacher_id = ${vals.teacherId}, schedule = ${vals.schedule}::jsonb,
       starts = ${vals.starts}, ends = ${vals.ends}, total_lessons = ${vals.total}, link = ${vals.link}, chat = ${vals.chat},
       materials = ${vals.materials}, color = ${vals.color} where id = ${gid}`;
   } else {
-    const row = await one<{ id: number }>`insert into bc_groups (kind, course, name, teacher, schedule, starts, ends, total_lessons, link, chat, materials, color)
-      values (${kind}, ${course}, ${vals.name}, ${vals.teacher}, ${vals.schedule}::jsonb, ${vals.starts}, ${vals.ends}, ${vals.total},
+    const row = await one<{ id: number }>`insert into bc_groups (kind, course, name, teacher, teacher_id, schedule, starts, ends, total_lessons, link, chat, materials, color)
+      values (${kind}, ${course}, ${vals.name}, ${vals.teacher}, ${vals.teacherId}, ${vals.schedule}::jsonb, ${vals.starts}, ${vals.ends}, ${vals.total},
         ${vals.link}, ${vals.chat}, ${vals.materials}, ${vals.color}) returning id`;
     gid = row?.id ?? null;
   }
@@ -280,26 +271,75 @@ export async function deleteGroup(id: number): Promise<AdminResult> {
   if (err) return { error: err };
   await db`delete from bc_members where group_id = ${id}`;
   await db`delete from bc_events where group_id = ${id}`;
+  await db`delete from bc_lesson_info where group_id = ${id}`;
   await db`delete from bc_groups where id = ${id}`;
   revalidatePath('/', 'layout');
   return { ok: true };
 }
 
-/* ------------------------------------------- события: сроки, доп. занятия */
+/* ------------------------------------------------------------- учителя */
 
-const KINDS = ['deadline', 'lesson', 'exam'];
-const TZONE = () => process.env.BOOTCAMP_TZ || 'Asia/Tashkent';
-
-/** Общая проверка полей события. Возвращает либо текст ошибки, либо готовые значения. */
-function eventFields(input: { kind?: string; title?: string; date?: string; time?: string; link?: unknown; note?: unknown }) {
-  const title = clean(input.title, 140);
-  const date = dateOrNull(input.date);
-  if (!title || !date) return 'Укажи название и дату';
-  const kind = KINDS.includes(input.kind || '') ? String(input.kind) : 'deadline';
-  // Срок сдачи без времени — до конца дня; занятие и тест по умолчанию с утра.
-  const time = HHMM.test(input.time || '') ? String(input.time) : kind === 'deadline' ? '23:59' : '10:00';
-  return { kind, title, at: `${date} ${time}`, link: url(input.link), note: clean(input.note, 300) };
+export interface TeacherInput {
+  name: string;
+  phone?: string;
+  note?: string;
+  /** ID групп и индивидуальных занятий, которые ведёт учитель. */
+  groups?: number[];
 }
+
+async function setTeacherGroups(id: string, name: string, groups: number[] | undefined) {
+  if (!groups) return;
+  const ids = groups.map(intOrNull).filter((x): x is number => x !== null);
+  // снятые группы остаются без учителя из списка, имя в них не трогаем
+  await db`update bc_groups set teacher_id = null where teacher_id = ${id} and not (id = any(${ids}::int[]))`;
+  if (ids.length) await db`update bc_groups set teacher_id = ${id}, teacher = ${name} where id = any(${ids}::int[])`;
+}
+
+export async function createTeacher(input: TeacherInput): Promise<AdminResult> {
+  const err = await guard();
+  if (err) return { error: err };
+  const name = clean(input.name, 80);
+  if (!name) return { error: 'Укажи имя учителя' };
+  let id = makeTeacherCode();
+  for (let i = 0; i < 5 && (await one`select 1 from bc_teachers where id = ${id}`); i++) id = makeTeacherCode();
+  await db`insert into bc_teachers (id, name, phone, note) values (${id}, ${name}, ${clean(input.phone, 40)}, ${clean(input.note, 500)})`;
+  await setTeacherGroups(id, name, input.groups);
+  revalidatePath('/', 'layout');
+  return { ok: true, id };
+}
+
+export async function updateTeacher(id: string, input: TeacherInput): Promise<AdminResult> {
+  const err = await guard();
+  if (err) return { error: err };
+  const name = clean(input.name, 80);
+  if (!name) return { error: 'Укажи имя учителя' };
+  await db`update bc_teachers set name = ${name}, phone = ${clean(input.phone, 40)}, note = ${clean(input.note, 500)} where id = ${id}`;
+  // имя учителя видят ученики — обновляем его во всех его группах
+  await db`update bc_groups set teacher = ${name} where teacher_id = ${id}`;
+  await setTeacherGroups(id, name, input.groups);
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+export async function unbindTeacher(id: string): Promise<AdminResult> {
+  const err = await guard();
+  if (err) return { error: err };
+  await db`update bc_teachers set user_id = null where id = ${id}`;
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+export async function deleteTeacher(id: string): Promise<AdminResult> {
+  const err = await guard();
+  if (err) return { error: err };
+  // группы остаются, в них остаётся имя учителя — просто без аккаунта
+  await db`update bc_groups set teacher_id = null where teacher_id = ${id}`;
+  await db`delete from bc_teachers where id = ${id}`;
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+/* ------------------------------------------- события: сроки, доп. занятия */
 
 /** Одно событие для группы или ученика — из карточки группы и карточки ученика. */
 export async function addEvent(input: { groupId?: number | null; studentId?: string | null; kind: string; title: string; date: string; time?: string }): Promise<AdminResult> {

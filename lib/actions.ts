@@ -8,7 +8,7 @@
 import { revalidatePath } from 'next/cache';
 import { db, one } from './db';
 import { USERNAME_RE, checkPassword, currentUser, hashPassword, normUsername } from './auth';
-import { normCode } from './data';
+import { STUDENT_CODE, TEACHER_CODE, normCode } from './data';
 
 export interface Result { ok?: boolean; error?: string }
 
@@ -16,13 +16,26 @@ export async function linkStudentId(raw: string): Promise<Result> {
   const u = await currentUser();
   if (!u) return { error: 'Сначала войди' };
   const code = normCode(raw);
-  if (!/^TZ-\d{4}-[A-Z0-9]{4}$/.test(code)) return { error: 'ID выглядит так: TZ-1234-ABCD' };
+  if (TEACHER_CODE.test(code)) return linkTeacher(u.id, code);
+  if (!STUDENT_CODE.test(code)) return { error: 'ID выглядит так: TZ-1234-ABCD' };
   const st = await one<{ id: string; user_id: string | null }>`select id, user_id from bc_students where id = ${code}`;
   if (!st) return { error: 'Такого ID нет. Проверь буквы и цифры или спроси у школы' };
   if (st.user_id && st.user_id !== u.id) return { error: 'Этот ID уже привязан к другому аккаунту. Напиши в школу' };
   const mine = await one<{ id: string }>`select id from bc_students where user_id = ${u.id}`;
   if (mine && mine.id !== code) return { error: `К аккаунту уже привязан ID ${mine.id}` };
   await db`update bc_students set user_id = ${u.id} where id = ${code}`;
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+/** ID учителя (TZT-…) вводится в то же поле, что и ID ученика. */
+async function linkTeacher(userId: string, code: string): Promise<Result> {
+  const t = await one<{ id: string; user_id: string | null }>`select id, user_id from bc_teachers where id = ${code}`;
+  if (!t) return { error: 'Такого ID учителя нет. Проверь буквы и цифры или спроси у администратора' };
+  if (t.user_id && t.user_id !== userId) return { error: 'Этот ID уже привязан к другому аккаунту. Напиши администратору' };
+  const mine = await one<{ id: string }>`select id from bc_teachers where user_id = ${userId}`;
+  if (mine && mine.id !== code) return { error: `К аккаунту уже привязан ID учителя ${mine.id}` };
+  await db`update bc_teachers set user_id = ${userId} where id = ${code}`;
   revalidatePath('/', 'layout');
   return { ok: true };
 }
