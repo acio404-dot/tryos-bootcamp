@@ -5,9 +5,10 @@ import { initials } from '@/lib/format';
 import { streakOf, type StreakInfo } from '@/lib/streak';
 import StreakBadge from './StreakBadge';
 import StreakCelebrate from './StreakCelebrate';
-import { IBook, ICal, IChart, ICheck, IFlame, IGear, IHome, IPlay, IShield, ITarget } from './icons';
+import MobileMenu, { MenuButton } from './MobileMenu';
+import { IBook, ICal, IChart, ICheck, IFlame, IGear, IGrid, IHome, ILogout, IPlay, IRedo, IShield, ITarget } from './icons';
 
-export type Tab = 'home' | 'exam' | 'trainer' | 'survival' | 'courses' | 'schedule' | 'progress' | 'settings' | 'admin';
+export type Tab = 'home' | 'practice' | 'exam' | 'trainer' | 'survival' | 'courses' | 'schedule' | 'progress' | 'settings' | 'admin';
 
 const MAIN = 'https://www.tryoszone.com';
 
@@ -44,8 +45,25 @@ export default async function Shell({
     ['settings', '/settings', 'Настройки', IGear],
   ];
   if (admin) nav.push(['admin', '/admin', 'Админка', IShield]);
-  // Внизу на телефоне помещается пять кнопок — самые частые.
-  const MOB: Tab[] = ['home', 'exam', 'trainer', 'progress', 'settings'];
+  // Телефон: внизу пять вкладок — главная, расписание, «Решать» (все режимы), прогресс и меню со всем остальным.
+  const practiceTabs: Tab[] = ['practice', 'exam', 'trainer', 'survival'];
+  const tabs: [string, string, () => JSX.Element, boolean][] = [
+    ['/', 'Главная', IHome, active === 'home'],
+    ['/schedule', 'Расписание', ICal, active === 'schedule'],
+    ['/practice', 'Решать', ITarget, practiceTabs.includes(active)],
+    ['/progress', 'Прогресс', IChart, active === 'progress'],
+  ];
+  const menuItems: [string, string, () => JSX.Element][] = [
+    ['/exam', 'Пробники', ITarget],
+    ['/trainer', 'Тренажёр', ICheck],
+    ['/mistakes', 'Ошибки', IRedo],
+    ['/survival', 'Выживание', IFlame],
+    ['/schedule', 'Расписание', ICal],
+    ['/courses', 'Мои курсы', IBook],
+    ['/progress', 'Прогресс', IChart],
+    ['/settings', 'Настройки', IGear],
+  ];
+  if (admin) menuItems.push(['/admin', 'Админка', IShield]);
 
   return (
     <div className="app">
@@ -71,20 +89,42 @@ export default async function Shell({
       <main className="main">
         <div className="mob-head">
           <Brand />
-          <Link className="ava ava-streak" href="/settings" aria-label="Настройки">
+          <MenuButton className="ava ava-streak" label="Меню и профиль">
             {initials(user.name)}
             {s ? <StreakBadge n={s.current} /> : null}
-          </Link>
+          </MenuButton>
         </div>
         {children}
       </main>
       {s ? <StreakCelebrate current={s.current} today={s.today} date={s.date} /> : null}
 
-      <nav className="tabbar" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
-        {nav.filter(([k]) => MOB.includes(k)).map(([k, href, label, Icon]) => (
-          <Link key={k} href={href} className={active === k ? 'on' : undefined}><Icon />{label === 'Настройки' ? 'Ещё' : label}</Link>
+      <nav className="tabbar" aria-label="Разделы">
+        {tabs.map(([href, label, Icon, on]) => (
+          <Link key={href} href={href} className={on ? 'on' : undefined} aria-current={on ? 'page' : undefined}><Icon />{label}</Link>
         ))}
+        <MenuButton className={['courses', 'settings', 'admin', 'mistakes'].includes(active) ? 'on' : undefined} label="Меню: все разделы">
+          <IGrid />Меню
+        </MenuButton>
       </nav>
+
+      <MobileMenu>
+        <div className="mm-me">
+          <span className="ava">{initials(user.name)}</span>
+          <span className="mm-who">
+            <b className="me-name">{user.name || 'Ученик'}{s ? <StreakBadge n={s.current} /> : null}</b>
+            <i>{student ? `ID ${student.id}` : user.username ? `@${user.username}` : 'ID не привязан'} · {level}</i>
+          </span>
+        </div>
+        <nav className="mm-grid" aria-label="Все разделы">
+          {menuItems.map(([href, label, Icon]) => (
+            <Link key={href} href={href} className={nav.some(([k, h]) => h === href && k === active) ? 'on' : undefined}><Icon />{label}</Link>
+          ))}
+        </nav>
+        <div className="mm-foot">
+          <a href={MAIN} target="_blank" rel="noopener noreferrer"><IPlay />Сайт школы ↗</a>
+          <a href="/api/auth/logout" className="mm-out"><ILogout />Выйти</a>
+        </div>
+      </MobileMenu>
     </div>
   );
 }

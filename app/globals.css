@@ -176,6 +176,7 @@ button{font:inherit;cursor:pointer}
 .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--ink-2)}
 .week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
 .day{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px 10px;min-height:190px;display:flex;flex-direction:column;gap:8px}
+.day-items{display:grid;gap:8px}
 .day.today{border-color:var(--teal);box-shadow:0 0 0 3px rgba(60,200,192,.15)}
 .day-h{display:flex;justify-content:space-between;align-items:baseline;padding:0 2px 6px;border-bottom:1px solid var(--line)}
 .day-h b{font-size:13px}
@@ -748,3 +749,119 @@ button{font:inherit;cursor:pointer}
   .scr-bar{flex-wrap:wrap;row-gap:8px}
   .scr-bar .scr-act{margin-left:auto}
 }
+
+/* ======================= телефон: навигация и компактная вёрстка ======================= */
+.mm{display:none}
+@media (max-width:900px){
+  /* нижняя панель: пять вкладок, «Меню» — кнопка */
+  .tabbar{grid-template-columns:repeat(5,1fr) !important;padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+  .tabbar a,.tabbar button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;border:0;border-radius:12px;background:none;font:inherit;font-size:11px;font-weight:700;color:#8FA6BF;cursor:pointer}
+  .tabbar a.on,.tabbar button.on{color:var(--teal-2);background:rgba(60,200,192,.12)}
+  .tabbar svg{width:21px;height:21px}
+  .mob-head{margin-bottom:12px}
+  .mob-head .ava{border:0;cursor:pointer;font:inherit;font-weight:800;font-size:14px}
+
+  /* меню снизу */
+  .mm{display:flex;position:fixed;inset:0;z-index:45;align-items:flex-end;background:rgba(7,18,31,.5);backdrop-filter:blur(2px);animation:mm-fade .15s ease-out}
+  .mm-sheet{position:relative;width:100%;max-height:88vh;overflow:auto;padding:10px 16px calc(16px + env(safe-area-inset-bottom));border-radius:22px 22px 0 0;background:#fff;box-shadow:0 -20px 50px -20px rgba(5,16,32,.5);animation:mm-up .22s cubic-bezier(.2,.9,.3,1)}
+  .mm-grip{width:40px;height:5px;margin:0 auto 12px;border-radius:999px;background:var(--paper-2)}
+  .mm-close{position:absolute;top:10px;right:12px;width:36px;height:36px;border:0;border-radius:12px;background:var(--paper);font-size:22px;line-height:1;color:var(--ink-2)}
+  .mm-me{display:flex;align-items:center;gap:12px;padding:4px 44px 14px 2px;border-bottom:1px solid var(--line)}
+  .mm-who{min-width:0}
+  .mm-who b{font-size:16px}
+  .mm-who i{display:block;font-style:normal;font-size:12.5px;color:var(--muted);margin-top:2px}
+  .mm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0}
+  .mm-grid a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:78px;padding:10px 6px;border-radius:16px;background:var(--paper);font-size:13px;font-weight:800;color:var(--ink);text-align:center}
+  .mm-grid a svg{width:22px;height:22px;color:var(--teal-deep)}
+  .mm-grid a.on{background:rgba(60,200,192,.14);color:var(--teal-deep)}
+  .mm-foot{display:flex;gap:8px}
+  .mm-foot a{flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:14px;border:1.5px solid var(--line);font-weight:800;font-size:13.5px;color:var(--ink-2)}
+  .mm-foot a svg{width:18px;height:18px}
+  .mm-foot .mm-out{color:#B8352D;border-color:rgba(224,72,63,.3)}
+  @keyframes mm-fade{from{opacity:0}}
+  @keyframes mm-up{from{transform:translateY(40px);opacity:.6}}
+
+  /* общая плотность */
+  .main{padding:12px 14px 92px}
+  .top{margin-bottom:14px;gap:10px}
+  .top h1{font-size:22px}
+  .top p{font-size:13.5px;margin-top:4px}
+  .m-hide{display:none !important}
+  .card{padding:16px;border-radius:18px}
+  .card-head{margin-bottom:10px}
+  .card h2{font-size:16px}
+  .mt{margin-top:12px}
+  .grid{gap:12px}
+  .tile{padding:12px 14px;border-radius:14px}
+  .tile b{font-size:22px;margin-top:4px}
+  .banner{padding:14px 16px;margin-bottom:12px;gap:10px}
+  .list li{padding:9px 6px;gap:10px}
+  .facts{grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:8px}
+  .facts div{padding:8px 10px}
+  .course-head h3{font-size:17px}
+  .mini-list li{flex-wrap:nowrap !important;padding:7px 10px;font-size:13px}
+  .mini-list li > span:first-child{flex:1 1 auto;min-width:0}
+  .resume{padding:14px 16px}
+
+  /* главная: ближайшее занятие → стрик → режимы → экзамен → остальное */
+  .home{display:flex;flex-direction:column;gap:12px}
+  .home > *{margin:0 !important}
+  .home .home-duo{display:contents}
+  .home .top{order:0}
+  .home .banner{order:1}
+  .home .h-lesson{order:2}
+  .home .h-streak{order:3}
+  .home .h-modes{order:4}
+  .home .h-exam{order:5}
+  .home > :nth-last-child(-n+3){order:6}
+  .home-duo > div > .card{height:100%}
+  .lesson-when{font-size:20px;margin:8px 0 2px}
+  .lesson-meta{margin:10px 0 12px;padding:10px 12px}
+  .days{margin:10px 0 4px}
+  .days b{font-size:44px}
+  .exam-goals{margin-top:12px;gap:8px}
+  .exam-goals div{padding:9px 10px}
+  .exam h3{margin-top:8px}
+
+  /* стрик компактнее */
+  .streak-strip{margin-bottom:0;padding:12px 14px;gap:10px}
+  .streak-flame{width:46px}
+  .streak-flame .sb-md{width:40px;height:48px}
+  .streak-flame .sb-md b{font-size:16px}
+  .streak-txt b{font-size:18px}
+  .streak-txt i{font-size:12.5px}
+  .streak-week i{height:26px;border-radius:8px}
+
+  /* режимы: плитки 2×2 без длинных описаний */
+  .modes{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:0}
+  .mode{padding:14px;gap:6px;border-radius:16px}
+  .mode::after{width:90px;height:90px;inset:auto -30px -36px auto}
+  .mode-ico{width:36px;height:36px;border-radius:11px}
+  .mode-ico svg{width:18px;height:18px}
+  .mode b{font-size:14.5px;line-height:1.25}
+  .mode i{display:none}
+  .practice-modes .modes{grid-template-columns:1fr}
+  .practice-modes .mode{display:grid;grid-template-columns:36px minmax(0,1fr);column-gap:12px;row-gap:2px}
+  .practice-modes .mode-ico{grid-row:1 / span 3}
+  .practice-modes .mode i{display:block;font-size:12.5px}
+  .mode-foot{margin-top:auto;font-size:11.5px}
+
+  /* расписание: сначала ближайшие занятия, неделя компактнее */
+  .sched{display:flex;flex-direction:column;gap:10px}
+  .sched > *{margin:0 !important}
+  .sched .upcoming{order:-1}
+  .week{gap:8px}
+  .day{display:grid;grid-template-columns:54px minmax(0,1fr);gap:10px;padding:10px 12px;border-radius:14px}
+  .day-h{flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:2px;padding:0 8px 0 0;border-bottom:0;border-right:1px solid var(--line)}
+  .day-h b{font-size:13px}
+  .day-items{display:grid;gap:6px}
+  .upcoming .list li{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:start;column-gap:12px}
+  .upcoming .list .go{grid-column:2;justify-self:start;margin-top:-2px}
+  .ev{padding:7px 9px}
+  .week-nav{width:100%;justify-content:space-between}
+  .upcoming .date-box{width:44px}
+  .upcoming .txt b{font-size:14px}
+  .upcoming .go{font-size:12.5px;white-space:nowrap}
+  .legend{gap:10px;font-size:12.5px}
+}
+@media (prefers-reduced-motion:reduce){.mm,.mm-sheet{animation:none}}
