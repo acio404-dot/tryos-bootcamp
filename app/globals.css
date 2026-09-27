@@ -290,6 +290,30 @@ button{font:inherit;cursor:pointer}
 .auth-list li::before{content:'';flex:0 0 auto;width:8px;height:8px;margin-top:8px;border-radius:50%;background:var(--teal-2);box-shadow:0 0 0 4px rgba(95,227,214,.18)}
 .auth-main{display:grid;place-items:center;padding:40px 20px}
 .auth-card{width:100%;max-width:420px}
+.auth-main{align-content:center;gap:14px}
+.auth-legal{max-width:420px;margin:0;text-align:center;font-size:12.5px;color:var(--muted)}
+.auth-legal a{color:var(--ink-2);text-decoration:underline;text-underline-offset:2px}
+/* политика конфиденциальности и условия */
+.legal{min-height:100vh;background:var(--paper);display:flex;flex-direction:column}
+.legal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 24px;background:var(--navy-950);color:#fff}
+.legal-head .brand b{color:#fff}
+.legal-head .seg{background:rgba(255,255,255,.1);flex-wrap:nowrap;flex:0 0 auto}
+.seg a{display:inline-block;padding:8px 12px;border-radius:9px;font-weight:800;font-size:13px;color:inherit;text-decoration:none;white-space:nowrap}
+.legal-head .seg a{color:#C9D8E8}
+.legal-head .seg a.on{background:#fff;color:var(--ink)}
+.legal-body{width:100%;max-width:760px;margin:0 auto;padding:40px 24px 24px;flex:1}
+.legal-body h1{font-family:var(--display);font-size:clamp(26px,4vw,36px);letter-spacing:-.04em;line-height:1.15;margin:0 0 6px}
+.legal-date{color:var(--muted);font-size:13.5px;margin:0 0 24px}
+.legal-body h2{font-size:19px;margin:30px 0 8px;letter-spacing:-.01em}
+.legal-body h3{font-size:15px;margin:16px 0 4px;color:var(--ink-2)}
+.legal-body p,.legal-body li{color:var(--ink-2);line-height:1.65}
+.legal-body p{margin:0 0 10px}
+.legal-body ul{margin:0 0 10px;padding-left:22px;display:grid;gap:6px}
+.legal-body a{color:var(--teal-deep);text-decoration:underline;text-underline-offset:2px}
+.legal-body code{font-size:.9em;background:var(--paper-2);padding:1px 6px;border-radius:6px}
+.legal-foot{display:flex;flex-wrap:wrap;gap:8px 18px;justify-content:center;padding:22px 24px 30px;border-top:1px solid var(--line);font-size:13.5px;color:var(--muted)}
+.legal-foot a{color:var(--ink-2)}
+@media (max-width:600px){.legal-head{padding:14px 16px}.legal-body{padding:26px 16px 16px}.legal-foot{padding:18px 16px 26px}}
 .auth-card h2{font-family:var(--display);font-size:24px;letter-spacing:-.04em;margin:0 0 6px}
 .auth-tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--paper-2);border-radius:14px;padding:4px;margin:18px 0}
 .auth-tabs button{border:0;background:transparent;padding:10px;border-radius:10px;font-weight:800;color:var(--ink-2)}
