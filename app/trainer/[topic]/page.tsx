@@ -7,6 +7,7 @@ import { can, studentOfUser } from '@/lib/data';
 import Locked from '@/components/Locked';
 import { topicInfo, topicQuestions } from '@/lib/bank';
 import { sourceLine } from '@/lib/bank-types';
+import { practiceAccess } from '@/lib/staff';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export default async function TopicPage({ params }: { params: { topic: string } 
   const user = await requireUser();
   const student = await studentOfUser(user.id);
   // «Все темы вперемешку» открыты всем; отдельные темы — ученикам с доступом к тренажёру.
-  if (!info.mixed && !can(student?.access, 'trainer')) {
+  if (!info.mixed && !can(await practiceAccess(user, student), 'trainer')) {
     return (
       <Shell user={user} student={student} active="trainer">
         <div className="top">

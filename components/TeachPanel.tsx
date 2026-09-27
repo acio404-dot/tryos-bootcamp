@@ -17,6 +17,8 @@ export interface TStudent {
   id: string; name: string; group_id: number; streak: number; bound: boolean;
   phone: string | null; note: string | null; exam_name: string | null; exam_date: string | null; exam_city: string | null;
   target_score: number | null; last_score: number | null;
+  /** Задач за 7 дней и точность за 30 дней (null — задач не было). */
+  week: number; acc: number | null;
 }
 export interface TLesson { date: string; start: string; end: string; group_id: number; link: string | null; own: boolean; topic: string | null }
 export interface TEvent { id: number; group_id: number | null; student_id?: string | null; kind: string; title: string; link: string | null; note: string | null; batch: string | null; day: string; time: string }
@@ -590,8 +592,13 @@ function StudentsTab({
                     {p.exam_date ? ` · экзамен ${p.exam_date.split('-').reverse().join('.')}` : ''}
                   </i>
                 </div>
+                {p.bound ? (
+                  <span className={`pill${p.week ? '' : ' warn'}`} title="Задач за 7 дней · точность за 30 дней">
+                    {p.week} {plural(p.week, 'задача', 'задачи', 'задач')} за неделю{p.acc != null ? ` · ${p.acc} %` : ''}
+                  </span>
+                ) : <span className="pill warn" title="Ученик ещё не ввёл свой ID">не вошёл</span>}
                 {p.last_score != null ? <span className="pill" title="Последний пробник">{p.last_score}{p.target_score ? ` / цель ${p.target_score}` : ''}</span> : null}
-                {p.bound ? null : <span className="pill warn" title="Ученик ещё не ввёл свой ID">не вошёл</span>}
+                <a className="btn btn-ghost btn-sm" href={`/students/${p.id}`}>Статистика</a>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(isOpen ? null : p.id)} aria-expanded={isOpen}>
                   {isOpen ? 'Свернуть' : 'Открыть'}
                 </button>

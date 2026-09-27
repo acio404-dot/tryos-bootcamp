@@ -6,6 +6,7 @@ import { streaksOf } from '@/lib/streak';
 import StreakBadge from '@/components/StreakBadge';
 import { myBestSurvival, survivalBoard } from '@/lib/runs';
 import { dateRu } from '@/lib/format';
+import { practiceAccess } from '@/lib/staff';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Режим выживания' };
@@ -39,7 +40,7 @@ export default async function Survival() {
 
       <div className="grid g-2 mt">
         <div>
-          <SurvivalFlow myBest={best} canMistakes={can(student?.access, 'trainer')} />
+          <SurvivalFlow myBest={best} canMistakes={can(await practiceAccess(user, student), 'trainer')} />
         </div>
 
         <div className="card">

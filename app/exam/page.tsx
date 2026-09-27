@@ -7,6 +7,7 @@ import { FORMATS, TOTAL_EXAM } from '@/lib/bank';
 import { hhmm } from '@/lib/bank-types';
 import { examHistory, openExamRun } from '@/lib/runs';
 import { dateRu } from '@/lib/format';
+import { practiceAccess } from '@/lib/staff';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Пробники' };
@@ -18,7 +19,7 @@ export default async function Exam() {
   const student = await studentOfUser(user.id);
   const [history, open] = await Promise.all([examHistory(user.id, 15), openExamRun(user.id)]);
 
-  const allowed = can(student?.access, 'exams');
+  const allowed = can(await practiceAccess(user, student), 'exams');
   const locked = allowed ? [] : FORMATS.map((f) => f.key).filter((k) => !FREE.includes(k));
   const best = history.length ? Math.max(...history.map((h) => h.score)) : 0;
 
