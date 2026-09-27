@@ -92,7 +92,7 @@ export default async function Courses() {
             {SECTIONS.map((s) => (
               <li key={s.key}><span>{s.label}</span><span className={`pill ${can(access, s.key) ? 'on' : ''}`}>{can(access, s.key) ? 'открыто' : 'закрыто'}</span></li>
             ))}
-            <li><span>Тренажёр и пробные тесты</span><span className="pill on">открыто</span></li>
+            <li><span>Быстрая диагностика, выживание и «все темы вперемешку»</span><span className="pill on">открыто</span></li>
           </ul>
         </div>
       ) : null}

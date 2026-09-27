@@ -123,12 +123,14 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
       ) : !allowed ? (
         <div className="card empty-card"><h2>Раздел закрыт</h2><p>В твоём уровне доступа расписание не открыто. Если это ошибка — напиши в школу.</p></div>
       ) : (
-        <>
+        <div className="sched">
           <div className="week">
             {days.map((d, i) => (
               <div key={d.date} className={`day${d.date === now.date ? ' today' : ''}${d.items.length ? '' : ' empty'}`}>
                 <div className="day-h"><b>{DOW[i]}{d.date === now.date ? ' · сегодня' : ''}</b><span>{dateShort(d.date).day}</span></div>
-                {d.items.length ? d.items.map((it) => <div key={it.key}>{it.html}</div>) : <span className="note" style={{ margin: 0 }}>Свободно</span>}
+                <div className="day-items">
+                  {d.items.length ? d.items.map((it) => <div key={it.key}>{it.html}</div>) : <span className="note" style={{ margin: 0 }}>Свободно</span>}
+                </div>
               </div>
             ))}
           </div>
@@ -150,7 +152,7 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
               <p className="muted" style={{ margin: 0 }}>В ближайшие две недели занятий нет.</p>
             )}
           </div>
-        </>
+        </div>
       )}
     </Shell>
   );

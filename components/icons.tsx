@@ -22,3 +22,4 @@ export const IGrid = () => (<svg {...S}><rect x="3.5" y="3.5" width="7" height="
 export const IMedal = () => (<svg {...S}><circle cx="12" cy="14" r="6" /><path d="M9 3h6l-1.5 5h-3z" /></svg>);
 export const ISigma = () => (<svg {...S}><path d="M17 5H7l5 7-5 7h10" /></svg>);
 export const IBrain = () => (<svg {...S}><path d="M9.5 4A2.5 2.5 0 0 0 7 6.5 2.5 2.5 0 0 0 5 9a2.5 2.5 0 0 0 1 2 2.5 2.5 0 0 0 1 4.6A2.5 2.5 0 0 0 9.5 20H12V4z" /><path d="M14.5 4A2.5 2.5 0 0 1 17 6.5 2.5 2.5 0 0 1 19 9a2.5 2.5 0 0 1-1 2 2.5 2.5 0 0 1-1 4.6A2.5 2.5 0 0 1 14.5 20H12" /></svg>);
+export const ILogout = () => (<svg {...S}><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="m10 17-5-5 5-5" /><path d="M5 12h11" /></svg>);

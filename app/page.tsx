@@ -44,18 +44,20 @@ export default async function Home() {
 
   return (
     <Shell user={user} student={student} active="home" streak={streak}>
+      {/* на телефоне блоки выстраиваются по порядку из CSS: сначала ближайшее занятие, потом стрик и режимы */}
+      <div className="home">
       <div className="top">
         <div>
           <h1>Привет, {firstName(user.name) || 'ученик'}!</h1>
           <p>Сегодня {DOW_FULL[now.dow - 1]}, {dateRu(now.date, false)}.</p>
         </div>
-        <div className="top-actions">
+        <div className="top-actions m-hide">
           <Link className="btn btn-ghost" href="/trainer">Тренажёр</Link>
           <Link className="btn btn-primary" href="/exam">Пробник</Link>
         </div>
       </div>
 
-      <StreakCard s={streak} />
+      <div className="h-streak"><StreakCard s={streak} /></div>
 
       {!student ? (
         <div className="banner">
@@ -67,11 +69,11 @@ export default async function Home() {
         </div>
       ) : null}
 
-      <ModeCards mistakes={mistakes} best={bestStreak} lockedMistakes={!can(access, 'trainer')} />
+      <div className="h-modes"><ModeCards mistakes={mistakes} best={bestStreak} lockedMistakes={!can(access, 'trainer')} /></div>
 
-      <div className="grid g-2 mt">
-        <ExamCard exam={exam} today={now.date} lastScore={lastScore} />
-        <NextLessonCard lesson={lessons[0] || null} today={now.date} />
+      <div className="grid g-2 mt home-duo">
+        <div className="h-exam"><ExamCard exam={exam} today={now.date} lastScore={lastScore} /></div>
+        <div className="h-lesson"><NextLessonCard lesson={lessons[0] || null} today={now.date} /></div>
       </div>
 
       <div className="grid g-3 mt">
@@ -151,6 +153,7 @@ export default async function Home() {
             <p className="muted" style={{ margin: 0 }}>{student ? 'Пока нет оценок и сроков — они появятся, когда их добавит преподаватель.' : 'Оценки преподавателей видны после привязки ID ученика.'}</p>
           )}
         </div>
+      </div>
       </div>
     </Shell>
   );
