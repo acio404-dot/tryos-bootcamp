@@ -970,3 +970,12 @@ button{font:inherit;cursor:pointer}
   .a-row-head .pill.acc-full{display:none}
   .a-row-head > .btn{flex:1 1 0;justify-content:center}
 }
+
+/* ------------------------------------ напоминания в Telegram */
+.nt-list{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.nt-row{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--paper);cursor:pointer}
+.nt-row input{flex:0 0 auto;margin-top:3px;width:18px;height:18px;accent-color:var(--teal-deep)}
+.nt-row b{display:block;font-size:14px}
+.nt-row i{display:block;font-style:normal;font-size:12.5px;color:var(--muted)}
+.tg-steps{margin:0;padding-left:20px;display:grid;gap:8px;color:var(--ink-2);line-height:1.55}
+.tg-steps code{font-size:.88em;background:var(--paper-2);padding:1px 6px;border-radius:6px;word-break:break-all}

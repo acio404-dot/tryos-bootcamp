@@ -21,6 +21,7 @@ import { SECTIONS, type Access, type Section } from '@/lib/access';
 import StreakBadge from './StreakBadge';
 import TeacherTag, { TeacherName } from './TeacherTag';
 import MockResults from './MockResults';
+import { adminConnectWebhook, adminRunReminders } from '@/lib/notify-actions';
 import type { MockBatch } from '@/lib/mock';
 import { DOW, dateShort, plural } from '@/lib/format';
 
@@ -185,7 +186,7 @@ const invite = (id: string, name: string) =>
 /* ============================================================ панель */
 
 export default function AdminPanel({
-  students, groups, members, scores, events, teachers, mocks, mockExams, today,
+  students, groups, members, scores, events, teachers, mocks, mockExams, today, tg,
 }: {
   students: AStudent[];
   groups: AGroup[];
@@ -196,8 +197,9 @@ export default function AdminPanel({
   mocks: MockBatch[];
   mockExams: { title: string; day: string; group_id: number | null }[];
   today: string;
+  tg: TgInfo;
 }) {
-  const [tab, setTab] = useState<'students' | 'teachers' | 'group' | 'solo' | 'events' | 'mocks' | 'exam'>('students');
+  const [tab, setTab] = useState<'students' | 'teachers' | 'group' | 'solo' | 'events' | 'mocks' | 'exam' | 'tg'>('students');
   const inGroups = groups.filter((g) => !isSolo(g));
   const solos = groups.filter(isSolo);
   const planned = events.filter((e) => e.batch).length;
@@ -226,9 +228,14 @@ export default function AdminPanel({
         <button type="button" role="tab" aria-selected={tab === 'exam'} className={tab === 'exam' ? 'on' : ''} onClick={() => setTab('exam')}>
           Дата экзамена
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'tg'} className={tab === 'tg' ? 'on' : ''} onClick={() => setTab('tg')}>
+          Telegram{tg.ready && tg.webhook?.url ? '' : ' · !'}
+        </button>
       </div>
       {tab === 'students' ? (
         <StudentsTab students={students} groups={groups} members={members} scores={scores} events={events} />
+      ) : tab === 'tg' ? (
+        <TgTab tg={tg} />
       ) : tab === 'mocks' ? (
         <MockResults
           everyone
@@ -1057,6 +1064,65 @@ function PlanRow({ plan, who }: { plan: Plan; who: string }) {
         >Удалить</button>
       </div>
       {act.error ? <p className="err" style={{ margin: '0 0 10px' }}>{act.error}</p> : null}
+    </div>
+  );
+}
+
+/* ============================================================ telegram */
+
+export interface TgInfo {
+  ready: boolean; bot: string; connected: number; cron: boolean;
+  webhook: { url: string; error: string | null } | null;
+}
+
+function TgTab({ tg }: { tg: TgInfo }) {
+  const act = useAction();
+  const [ok, setOk] = useState('');
+  const run = (fn: () => Promise<{ ok?: boolean; error?: string; text?: string }>) => {
+    setOk('');
+    act.run(async () => { const r = await fn(); if (r.text) setOk(r.text); return r; });
+  };
+  const hookOk = Boolean(tg.webhook?.url);
+
+  return (
+    <div className="grid" style={{ gap: 16 }}>
+      <div className="card">
+        <div className="card-head"><h2>Напоминания в Telegram</h2><span className="note" style={{ margin: 0 }}>подключено аккаунтов: {tg.connected}</span></div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Бот пишет ученикам и учителям за час до занятия (со ссылкой), за сутки до срока, вечером — о стрике,
+          и сразу — о новых доп. занятиях и тестах. Ученик подключает бота в «Настройках»; кто вошёл через Telegram — уже подключён.
+        </p>
+        <ul className="mini-list">
+          <li><span>1. Бот (TELEGRAM_BOT_TOKEN и TELEGRAM_BOT_NAME в Vercel)</span>
+            {tg.ready ? <span className="pill on">@{tg.bot}</span> : <span className="pill warn">не задан</span>}</li>
+          <li><span>2. Вебхук — чтобы бот принимал «Start»</span>
+            {hookOk ? <span className="pill on">подключён</span> : <span className="pill warn">не подключён</span>}</li>
+          <li><span>3. Расписание запуска (CRON_SECRET + GitHub Actions или cron-job.org)</span>
+            {tg.cron ? <span className="pill on">секрет задан</span> : <span className="pill warn">CRON_SECRET не задан</span>}</li>
+        </ul>
+        {tg.webhook?.error ? <p className="err" style={{ marginTop: 10 }}>Последняя ошибка вебхука: {tg.webhook.error}</p> : null}
+        <div className="row" style={{ alignItems: 'center', marginTop: 14 }}>
+          <button type="button" className="btn btn-dark btn-sm" disabled={act.pending || !tg.ready} onClick={() => run(adminConnectWebhook)}>
+            {hookOk ? 'Переподключить вебхук' : 'Подключить вебхук'}
+          </button>
+          <button type="button" className="btn btn-ghost btn-sm" disabled={act.pending || !tg.ready} onClick={() => run(adminRunReminders)}>
+            Разослать напоминания сейчас
+          </button>
+          {ok ? <p className="okmsg">{ok}</p> : null}
+          {act.error ? <p className="err">{act.error}</p> : null}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><h2>Как включить автоматическую рассылку</h2></div>
+        <ol className="tg-steps">
+          <li>В Vercel → Settings → Environment Variables добавь <code>CRON_SECRET</code> — любую длинную случайную строку — и сделай Redeploy.</li>
+          <li>В GitHub → репозиторий → Settings → Secrets and variables → Actions добавь секрет <code>CRON_SECRET</code> с тем же значением.
+            Рассылку раз в 10 минут запускает <code>.github/workflows/reminders.yml</code>.</li>
+          <li>Вместо GitHub можно завести задачу на cron-job.org: каждые 10 минут открывать
+            <code>https://bootcamp.tryoszone.com/api/cron/reminders?key=CRON_SECRET</code>.</li>
+        </ol>
+      </div>
     </div>
   );
 }

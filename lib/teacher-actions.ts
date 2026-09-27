@@ -12,6 +12,7 @@ import { currentUser } from './auth';
 import { HHMM, TZONE, clean, dateOrNull, eventFields, intOrNull, scoreFields, slotsOf, url } from './fields';
 import type { Slot } from './data';
 import { deleteMock, mockFields, saveMock, type MockInput } from './mock';
+import { notifyNewEvents } from './reminders';
 
 export interface TeacherResult { ok?: boolean; error?: string }
 
@@ -92,6 +93,7 @@ export async function addTeacherEvent(input: TeacherEventInput): Promise<Teacher
     await db`insert into bc_events (group_id, student_id, kind, title, at, scope, batch, link, note)
       values (${id}, null, ${f.kind}, ${f.title}, (${f.at}::timestamp at time zone ${tz}), 'target', ${batch}, ${f.link}, ${f.note})`;
   }
+  await notifyNewEvents((await db<{ id: number }>`select id from bc_events where batch = ${batch}`).map((x) => x.id));
   return done();
 }
 
@@ -226,8 +228,9 @@ export async function addStudentEvent(
   if (typeof r === 'string') return { error: r };
   const f = eventFields(input);
   if (typeof f === 'string') return { error: f };
-  await db`insert into bc_events (group_id, student_id, kind, title, at, scope, link, note)
-    values (null, ${r.sid}, ${f.kind}, ${f.title}, (${f.at}::timestamp at time zone ${TZONE()}), 'target', ${f.link}, ${f.note})`;
+  const row = await one<{ id: number }>`insert into bc_events (group_id, student_id, kind, title, at, scope, link, note)
+    values (null, ${r.sid}, ${f.kind}, ${f.title}, (${f.at}::timestamp at time zone ${TZONE()}), 'target', ${f.link}, ${f.note}) returning id`;
+  if (row) await notifyNewEvents([row.id]);
   return done();
 }
 

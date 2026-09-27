@@ -113,6 +113,21 @@ function ensureSchema(): Promise<void> {
       )`;
       // Кто из учителей поставил оценку: учитель может удалить только свои.
       await q`alter table bc_scores add column if not exists teacher_id text`;
+      // Напоминания в Telegram: чат (после /start в боте) и какие напоминания
+      // включены. Если чата нет, пишем на tg_id — вход через Telegram уже
+      // даёт боту право писать. notify: {"lessons":false,...} — выключенные.
+      await q`alter table bc_users add column if not exists tg_chat_id bigint`;
+      await q`alter table bc_users add column if not exists notify jsonb not null default '{}'::jsonb`;
+      await q`create table if not exists bc_tg_links (
+        code text primary key,
+        user_id text not null,
+        created_at timestamptz not null default now()
+      )`;
+      // Что уже отправлено — чтобы одно напоминание не пришло дважды.
+      await q`create table if not exists bc_notify_log (
+        key text primary key,
+        sent_at timestamptz not null default now()
+      )`;
       await q`create table if not exists bc_events (
         id serial primary key,
         group_id int,
