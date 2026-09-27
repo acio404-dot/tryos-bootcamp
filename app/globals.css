@@ -937,3 +937,10 @@ button{font:inherit;cursor:pointer}
   .mk-row{grid-template-columns:minmax(0,1fr) 84px}
   .mk-opt{display:none}
 }
+.t-people li button{all:unset;display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+.t-people li:has(button):hover{background:var(--paper-2)}
+.t-people li .c-dot{margin-right:4px}
+.t-sched{margin:0 0 16px;padding:12px 14px;border-radius:14px;background:var(--paper)}
+.t-sched-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.t-sched-head i{font-style:normal;color:var(--muted);font-size:13px}
+.t-edit-flat{margin:12px 0 0}

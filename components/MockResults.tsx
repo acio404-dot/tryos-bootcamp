@@ -37,9 +37,23 @@ export default function MockResults({
   const [pending, start] = useTransition();
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
-  const [gid, setGid] = useState<string>(groups.length === 1 ? String(groups[0].id) : '');
-  const [title, setTitle] = useState('Пробное тестирование');
-  const [date, setDate] = useState(today);
+  // проведённые тестирования из расписания: одно на несколько групп — один пункт
+  const held = useMemo(
+    () => exams.filter((x, i) => x.day <= today && exams.findIndex((y) => y.title === x.title && y.day === x.day) === i),
+    [exams, today],
+  );
+  const entered = (x: MExam) => batches.find((b) => b.title === x.title && b.date === x.day);
+  const firstNew = held.findIndex((x) => !entered(x));
+  const start0 = firstNew >= 0 ? held[firstNew] : null;
+  const groupOk = (id: number | null) => id != null && groups.some((g) => g.id === id);
+
+  // что выбрано в «Тестирование»: ev:N — из расписания, b:ID — уже внесённое, new — своё
+  const [pick, setPick] = useState<string>(start0 ? `ev:${firstNew}` : 'new');
+  const [gid, setGid] = useState<string>(
+    start0 && groupOk(start0.group_id) ? String(start0.group_id) : groups.length === 1 ? String(groups[0].id) : '',
+  );
+  const [title, setTitle] = useState(start0?.title || 'Пробное тестирование');
+  const [date, setDate] = useState(start0?.day || today);
   const [batch, setBatch] = useState<string | null>(null);
   const [vals, setVals] = useState<Record<string, typeof blankRow>>({});
   const [q, setQ] = useState('');
@@ -66,7 +80,28 @@ export default function MockResults({
     setVals({ ...vals, [id]: { ...(vals[id] || blankRow), [k]: v.replace(/[^\d]/g, '').slice(0, 3) } });
   };
 
-  const reset = () => { setBatch(null); setVals({}); setTitle('Пробное тестирование'); setDate(today); };
+  const reset = () => { setBatch(null); setVals({}); setTitle('Пробное тестирование'); setDate(today); setPick('new'); };
+
+  const choose = (v: string) => {
+    setOk(''); setError('');
+    if (v.startsWith('b:')) {
+      const b = batches.find((x) => x.batch === v.slice(2));
+      if (b) edit(b);
+      return;
+    }
+    setBatch(null); setVals({}); setPick(v);
+    if (v.startsWith('ev:')) {
+      const x = held[Number(v.slice(3))];
+      if (x) {
+        const b = entered(x);
+        if (b) { edit(b); return; }
+        setTitle(x.title); setDate(x.day);
+        if (groupOk(x.group_id)) setGid(String(x.group_id));
+      }
+    } else {
+      setTitle('Пробное тестирование'); setDate(today);
+    }
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +122,7 @@ export default function MockResults({
 
   const edit = (b: MockBatch) => {
     setOk(''); setError('');
-    setBatch(b.batch); setTitle(b.title); setDate(b.date);
+    setBatch(b.batch); setTitle(b.title); setDate(b.date); setPick(`b:${b.batch}`);
     setVals(Object.fromEntries(b.rows.map((r) => [r.student_id, { score: String(r.score), correct: r.correct ? String(r.correct) : '', wrong: r.wrong ? String(r.wrong) : '' }])));
     // группа, в которой больше всего учеников этого тестирования
     const counts = new Map<number, number>();
@@ -107,9 +142,6 @@ export default function MockResults({
     });
   };
 
-  // одно тестирование, назначенное нескольким группам, — одна кнопка
-  const recent = exams.filter((x, i) => x.day <= today && exams.findIndex((y) => y.title === x.title && y.day === x.day) === i).slice(0, 4);
-
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="card">
@@ -119,21 +151,33 @@ export default function MockResults({
         </div>
 
         <form className="form" onSubmit={submit}>
-          {!batch && recent.length ? (
-            <div className="field">
-              <span className="field-label">Недавние тестирования из расписания</span>
-              <span className="t-quick">
-                {recent.map((x, i) => (
-                  <button key={i} type="button" className={title === x.title && date === x.day ? 'on' : ''}
-                    onClick={() => { setOk(''); setTitle(x.title); setDate(x.day); if (x.group_id) setGid(String(x.group_id)); }}>
-                    {x.title} · {dateShort(x.day).day} {dateShort(x.day).mon}
-                  </button>
-                ))}
-              </span>
-            </div>
-          ) : null}
-
-          <div className="fields-3">
+          <div className="fields-2">
+            <label className="field">
+              <span className="field-label">Тестирование</span>
+              <select className="select" value={pick} onChange={(e) => choose(e.target.value)}>
+                {held.length ? (
+                  <optgroup label="Проведённые по расписанию">
+                    {held.map((x, i) => {
+                      const g = groups.find((y) => y.id === x.group_id);
+                      return (
+                        <option key={i} value={`ev:${i}`}>
+                          {x.title} · {dateShort(x.day).day} {dateShort(x.day).mon}{g ? ` · ${gTitle(g)}` : ''}{entered(x) ? ' · внесено' : ''}
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                ) : null}
+                {batches.length ? (
+                  <optgroup label="Уже внесённые — изменить">
+                    {batches.map((x) => (
+                      <option key={x.batch} value={`b:${x.batch}`}>{x.title} · {dateShort(x.date).day} {dateShort(x.date).mon} · {x.rows.length} уч.</option>
+                    ))}
+                  </optgroup>
+                ) : null}
+                <option value="new">+ Своё тестирование</option>
+              </select>
+              {!held.length ? <small>Тестирования из расписания появятся здесь, когда пройдут. Пока можно добавить своё.</small> : null}
+            </label>
             <label className="field">
               <span className="field-label">Группа</span>
               <select className="select" value={gid} onChange={(e) => { setOk(''); setGid(e.target.value); }}>
@@ -142,15 +186,20 @@ export default function MockResults({
                 {everyone ? <option value="all">Все ученики</option> : null}
               </select>
             </label>
-            <label className="field">
-              <span className="field-label">Тестирование</span>
-              <input className="input" required value={title} onChange={(e) => { setOk(''); setTitle(e.target.value); }} />
-            </label>
-            <label className="field">
-              <span className="field-label">Дата</span>
-              <input className="input" type="date" required max={today} value={date} onChange={(e) => { setOk(''); setDate(e.target.value); }} />
-            </label>
           </div>
+
+          {pick === 'new' || batch ? (
+            <div className="fields-2">
+              <label className="field">
+                <span className="field-label">Название</span>
+                <input className="input" required value={title} onChange={(e) => { setOk(''); setTitle(e.target.value); }} placeholder="Пробник в центре, 12 октября" />
+              </label>
+              <label className="field">
+                <span className="field-label">Дата</span>
+                <input className="input" type="date" required max={today} value={date} onChange={(e) => { setOk(''); setDate(e.target.value); }} />
+              </label>
+            </div>
+          ) : null}
 
           {gid ? (
             <div className="field">

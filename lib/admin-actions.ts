@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { db, one } from './db';
 import { currentUser, isAdmin } from './auth';
-import { HHMM, TZONE, clean, dateOrNull, eventFields, intOrNull, scoreFields, url } from './fields';
+import { TZONE, clean, dateOrNull, eventFields, intOrNull, scoreFields, slotsOf, url } from './fields';
 import { deleteMock, mockFields, saveMock, type MockInput } from './mock';
 import { SECTIONS, makeStudentCode, makeTeacherCode, type Access, type Section, type Slot } from './data';
 
@@ -204,18 +204,6 @@ export interface GroupInput {
   chat?: string;
   materials?: string;
   color?: string;
-}
-
-function slotsOf(list: Slot[] | undefined): Slot[] | string {
-  const out: Slot[] = [];
-  for (const s of list || []) {
-    const dow = intOrNull(s.dow);
-    if (!dow || dow < 1 || dow > 7) continue;
-    if (!HHMM.test(s.start) || !HHMM.test(s.end)) return 'Время занятий — в формате 19:00';
-    if (s.end <= s.start) return 'Конец занятия должен быть позже начала';
-    out.push({ dow, start: s.start, end: s.end });
-  }
-  return out;
 }
 
 export async function saveGroup(id: number | null, input: GroupInput): Promise<AdminResult> {

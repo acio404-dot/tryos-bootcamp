@@ -185,7 +185,7 @@ const invite = (id: string, name: string) =>
 /* ============================================================ панель */
 
 export default function AdminPanel({
-  students, groups, members, scores, events, teachers, mocks, today,
+  students, groups, members, scores, events, teachers, mocks, mockExams, today,
 }: {
   students: AStudent[];
   groups: AGroup[];
@@ -194,6 +194,7 @@ export default function AdminPanel({
   events: AEvent[];
   teachers: ATeacher[];
   mocks: MockBatch[];
+  mockExams: { title: string; day: string; group_id: number | null }[];
   today: string;
 }) {
   const [tab, setTab] = useState<'students' | 'teachers' | 'group' | 'solo' | 'events' | 'mocks' | 'exam'>('students');
@@ -237,7 +238,7 @@ export default function AdminPanel({
             ...students.filter((s) => !members.some((m) => m.student_id === s.id)).map((s) => ({ id: s.id, name: s.name, group_id: null })),
           ]}
           batches={mocks}
-          exams={events.filter((e) => e.kind === 'exam').map((e) => ({ title: e.title, day: e.at.slice(0, 10), group_id: e.group_id })).reverse()}
+          exams={mockExams}
           today={today}
           save={saveMockResults}
           remove={deleteMockResults}

@@ -9,7 +9,8 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { db, one } from './db';
 import { currentUser } from './auth';
-import { HHMM, TZONE, clean, dateOrNull, eventFields, scoreFields, url } from './fields';
+import { HHMM, TZONE, clean, dateOrNull, eventFields, intOrNull, scoreFields, slotsOf, url } from './fields';
+import type { Slot } from './data';
 import { deleteMock, mockFields, saveMock, type MockInput } from './mock';
 
 export interface TeacherResult { ok?: boolean; error?: string }
@@ -159,5 +160,83 @@ export async function deleteTeacherMock(batch: string): Promise<TeacherResult> {
   if (!t) return { error: 'Нет доступа: войди как учитель' };
   const n = await deleteMock(String(batch || '').slice(0, 64), t.id);
   if (!n) return { error: 'Удалить можно только свои тестирования' };
+  return done();
+}
+
+/* ------------------------------------------ расписание и ученики учителя */
+
+/** Расписание своей группы или индивидуальных занятий: дни, время, даты курса. */
+export async function saveTeacherSchedule(
+  groupId: number,
+  input: { schedule: Slot[]; starts?: string; ends?: string; total?: string },
+): Promise<TeacherResult> {
+  const r = await myGroup(groupId);
+  if (typeof r === 'string') return { error: r };
+  const slots = slotsOf(input.schedule);
+  if (typeof slots === 'string') return { error: slots };
+  const starts = dateOrNull(input.starts);
+  const ends = dateOrNull(input.ends);
+  if (starts && ends && ends < starts) return { error: 'Конец курса раньше начала' };
+  await db`update bc_groups set schedule = ${JSON.stringify(slots)}::jsonb, starts = ${starts}, ends = ${ends},
+    total_lessons = ${intOrNull(input.total)} where id = ${r.gid}`;
+  return done();
+}
+
+/** Учитель и его ученик. Ошибка, если ученик не из его групп. */
+async function myStudent(studentId: unknown): Promise<{ t: Me; sid: string } | string> {
+  const t = await me();
+  if (!t) return 'Нет доступа: войди как учитель';
+  const sid = clean(studentId, 40);
+  if (!sid) return 'Ученик не найден';
+  const ok = await one`select 1 from bc_members m join bc_groups g on g.id = m.group_id where m.student_id = ${sid} and g.teacher_id = ${t.id}`;
+  return ok ? { t, sid } : 'Это не твой ученик';
+}
+
+export interface TeacherStudentInput {
+  name: string;
+  phone?: string;
+  note?: string;
+  examName?: string;
+  examDate?: string;
+  examCity?: string;
+  target?: string;
+}
+
+/** Данные ученика: имя, контакт, заметка, экзамен и цель. Доступ и группы меняет только админ. */
+export async function updateTeacherStudent(studentId: string, input: TeacherStudentInput): Promise<TeacherResult> {
+  const r = await myStudent(studentId);
+  if (typeof r === 'string') return { error: r };
+  const name = clean(input.name, 80);
+  if (!name) return { error: 'Укажи имя ученика' };
+  if (input.examDate && !dateOrNull(input.examDate)) return { error: 'Неверная дата экзамена' };
+  const target = intOrNull(input.target);
+  if (target !== null && (target < 0 || target > 500)) return { error: 'Цель — балл от 0 до 500' };
+  await db`update bc_students set name = ${name}, phone = ${clean(input.phone, 40)}, note = ${clean(input.note, 500)},
+    exam_name = ${clean(input.examName, 80)}, exam_date = ${dateOrNull(input.examDate)}, exam_city = ${clean(input.examCity, 60)},
+    target_score = ${target} where id = ${r.sid}`;
+  return done();
+}
+
+/** Личный срок или занятие только для одного ученика. */
+export async function addStudentEvent(
+  studentId: string,
+  input: { kind: string; title: string; date: string; time?: string; link?: string; note?: string },
+): Promise<TeacherResult> {
+  const r = await myStudent(studentId);
+  if (typeof r === 'string') return { error: r };
+  const f = eventFields(input);
+  if (typeof f === 'string') return { error: f };
+  await db`insert into bc_events (group_id, student_id, kind, title, at, scope, link, note)
+    values (null, ${r.sid}, ${f.kind}, ${f.title}, (${f.at}::timestamp at time zone ${TZONE()}), 'target', ${f.link}, ${f.note})`;
+  return done();
+}
+
+export async function deleteStudentEvent(id: number): Promise<TeacherResult> {
+  const t = await me();
+  if (!t) return { error: 'Нет доступа: войди как учитель' };
+  const ev = await one`select 1 from bc_events e where e.id = ${id} and e.student_id is not null and exists (
+    select 1 from bc_members m join bc_groups g on g.id = m.group_id where m.student_id = e.student_id and g.teacher_id = ${t.id})`;
+  if (!ev) return { error: 'Это не срок твоего ученика' };
+  await db`delete from bc_events where id = ${id}`;
   return done();
 }

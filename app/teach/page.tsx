@@ -36,11 +36,17 @@ export default async function Teach() {
   const now = nowInTz();
 
   const [students, events, scores, mocks, exams] = await Promise.all([
-    db<TStudent & { user_id: string | null }>`select s.id, s.name, s.user_id, m.group_id from bc_members m
-      join bc_students s on s.id = m.student_id where m.group_id = any(${ids}::int[]) order by s.name`,
-    db<TEvent>`select id, group_id, kind, title, link, note, batch,
+    db<Omit<TStudent, 'streak' | 'bound' | 'last_score'> & { user_id: string | null; last_score: number | null }>`select s.id, s.name, s.user_id, m.group_id,
+        s.phone, s.note, s.exam_name, to_char(s.exam_date, 'YYYY-MM-DD') as exam_date, s.exam_city, s.target_score,
+        (select t.score from bc_tests t where t.student_id = s.id or (s.user_id is not null and t.user_id = s.user_id)
+          order by t.created_at desc limit 1) as last_score
+      from bc_members m join bc_students s on s.id = m.student_id where m.group_id = any(${ids}::int[]) order by s.name`,
+    // события групп и личные сроки учеников этих групп
+    db<TEvent>`select id, group_id, student_id, kind, title, link, note, batch,
         to_char(at at time zone ${TZ}, 'YYYY-MM-DD') as day, to_char(at at time zone ${TZ}, 'HH24:MI') as time
-      from bc_events where group_id = any(${ids}::int[]) and at > now() - interval '1 day' order by at limit 60`,
+      from bc_events where (group_id = any(${ids}::int[])
+          or student_id in (select student_id from bc_members where group_id = any(${ids}::int[])))
+        and at > now() - interval '1 day' order by at limit 100`,
     db<TScore>`select sc.id, sc.student_id, s.name as student, sc.title, sc.value::float as value, sc.max::float as max,
         to_char(sc.date, 'YYYY-MM-DD') as date
       from bc_scores sc join bc_students s on s.id = sc.student_id
@@ -48,11 +54,11 @@ export default async function Teach() {
     mockBatches(teacher.id),
     // прошедшие тестирования из расписания — чтобы внести по ним баллы в один клик
     db<{ title: string; day: string; group_id: number }>`select title, group_id, to_char(at at time zone ${TZ}, 'YYYY-MM-DD') as day
-      from bc_events where kind = 'exam' and group_id = any(${ids}::int[]) and at > now() - interval '45 days' and at < now() + interval '1 day'
-      order by at desc limit 20`,
+      from bc_events where kind = 'exam' and group_id = any(${ids}::int[]) and at > now() - interval '180 days' and at < now() + interval '1 day'
+      order by at desc limit 60`,
   ]);
   const streaks = await streaksOf(students.map((s) => s.user_id || ''));
-  const people: TStudent[] = students.map((s) => ({ id: s.id, name: s.name, group_id: s.group_id, streak: s.user_id ? streaks[s.user_id] || 0 : 0 }));
+  const people: TStudent[] = students.map(({ user_id, ...s }) => ({ ...s, bound: Boolean(user_id), streak: user_id ? streaks[user_id] || 0 : 0 }));
 
   const lessons: TLesson[] = (await withLessonInfo(upcomingLessons(groups, 14, 40))).map((l) => ({
     date: l.date, start: l.start, end: l.end, group_id: l.group.id,
