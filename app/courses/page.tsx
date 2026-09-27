@@ -2,8 +2,9 @@ import Shell from '@/components/Shell';
 import { TeacherName } from '@/components/TeacherTag';
 import LinkIdForm from '@/components/LinkIdForm';
 import { scheduleText } from '@/components/widgets';
-import { requireUser } from '@/lib/auth';
-import { SECTIONS, can, groupsOfStudent, lessonsDone, studentOfUser } from '@/lib/data';
+import { redirect } from 'next/navigation';
+import { isAdmin, requireUser } from '@/lib/auth';
+import { SECTIONS, can, groupsOfStudent, lessonsDone, studentOfUser, teacherOfUser } from '@/lib/data';
 import { dateRu } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,11 @@ const COLORS = ['#1E8F8A', '#2C7FB0', '#7A5AC8', '#C9791C', '#1F9D6B'];
 export default async function Courses() {
   const user = await requireUser();
   const student = await studentOfUser(user.id);
+  // У учителя и админа без ID ученика своих курсов нет — ведём в их раздел.
+  if (!student) {
+    if (await teacherOfUser(user.id)) redirect('/teach');
+    if (isAdmin(user)) redirect('/admin');
+  }
   const access = student?.access;
   const groups = student && can(access, 'courses') ? await groupsOfStudent(student.id) : [];
 

@@ -4,7 +4,7 @@ import LinkIdForm from '@/components/LinkIdForm';
 import ModeCards from '@/components/ModeCards';
 import { ExamCard, NextLessonCard, ScoreChart, SECTION_RU, SectionBars, tone } from '@/components/widgets';
 import { redirect } from 'next/navigation';
-import { requireUser } from '@/lib/auth';
+import { isAdmin, requireUser } from '@/lib/auth';
 import {
   addDays, can, eventsOf, examOf, groupsOfStudent, nowInTz, progressOf, scoresOf, studentOfUser, teacherOfUser, upcomingLessons, withLessonInfo,
 } from '@/lib/data';
@@ -21,6 +21,8 @@ export default async function Home() {
   const student = await studentOfUser(user.id);
   // Учитель без ID ученика сразу попадает в свой кабинет.
   if (!student && (await teacherOfUser(user.id))) redirect('/teach');
+  // Админ без ID ученика: главная ученика ему не нужна — сразу в админку.
+  if (!student && isAdmin(user)) redirect('/admin');
   const now = nowInTz();
   const access = student?.access;
 

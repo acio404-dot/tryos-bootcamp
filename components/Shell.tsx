@@ -49,26 +49,32 @@ export default async function Shell({
     ['schedule', '/schedule', 'Расписание', ICal],
     ['settings', '/settings', 'Настройки', IGear],
   ];
-  // Учитель: его кабинет первым пунктом. Все режимы решения задач ему открыты;
-  // если он не ученик, разделы про курсы и расписание ученика не нужны.
-  if (teacher) {
-    if (student) nav.splice(1, 0, ['teach', '/teach', 'Мои группы', IUsers]);
-    else {
-      nav.splice(0, nav.length,
-        ['teach', '/teach', 'Мои группы', IUsers],
-        ['exam', '/exam', 'Пробники', ITarget],
-        ['trainer', '/trainer', 'Тренажёр', ICheck],
-        ['survival', '/survival', 'Выживание', IFlame],
-        ['progress', '/progress', 'Прогресс', IChart],
-        ['settings', '/settings', 'Настройки', IGear]);
-    }
+  // Роли без ID ученика: учитель начинает с «Мои группы», админ — с админки.
+  // Разделы про курсы ученика им не нужны; режимы решения задач открыты.
+  const staffOnly = !student && (teacher || admin);
+  const practiceNav: [Tab, string, string, () => JSX.Element][] = [
+    ['exam', '/exam', 'Пробники', ITarget],
+    ['trainer', '/trainer', 'Тренажёр', ICheck],
+    ['survival', '/survival', 'Выживание', IFlame],
+    ['progress', '/progress', 'Прогресс', IChart],
+  ];
+  if (staffOnly) {
+    nav.splice(0, nav.length,
+      ...(teacher ? [['teach', '/teach', 'Мои группы', IUsers], ['schedule', '/schedule', 'Расписание', ICal]] as typeof nav : []),
+      ...practiceNav,
+      ['settings', '/settings', 'Настройки', IGear]);
+    if (admin) nav.splice(teacher ? 2 : 0, 0, ['admin', '/admin', 'Админка', IShield]);
+  } else {
+    if (teacher) nav.splice(1, 0, ['teach', '/teach', 'Мои группы', IUsers]);
+    if (admin) nav.push(['admin', '/admin', 'Админка', IShield]);
   }
-  if (admin) nav.push(['admin', '/admin', 'Админка', IShield]);
-  // Телефон: внизу пять вкладок — главная, расписание, «Решать» (все режимы), прогресс и меню со всем остальным.
+  // Телефон: внизу до пяти вкладок, остальное — в «Меню».
   const practiceTabs: Tab[] = ['practice', 'exam', 'trainer', 'survival'];
-  const tabs: [string, string, () => JSX.Element, boolean][] = teacher && !student
+  const tabs: [string, string, () => JSX.Element, boolean][] = staffOnly
     ? [
-      ['/teach', 'Группы', IUsers, active === 'teach'],
+      ...(teacher
+        ? [['/teach', 'Группы', IUsers, active === 'teach'], ['/schedule', 'Расписание', ICal, active === 'schedule']] as [string, string, () => JSX.Element, boolean][]
+        : [['/admin', 'Админка', IShield, active === 'admin']] as [string, string, () => JSX.Element, boolean][]),
       ['/practice', 'Решать', ITarget, practiceTabs.includes(active)],
       ['/progress', 'Прогресс', IChart, active === 'progress'],
     ]
@@ -87,7 +93,7 @@ export default async function Shell({
     ['/courses', 'Мои курсы', IBook],
     ['/progress', 'Прогресс', IChart],
     ['/settings', 'Настройки', IGear],
-  ];
+  ].filter(([href]) => !staffOnly || (href !== '/courses' && (href !== '/schedule' || teacher))) as [string, string, () => JSX.Element][];
   if (teacher) menuItems.unshift(['/teach', 'Мои группы', IUsers]);
   if (admin) menuItems.push(['/admin', 'Админка', IShield]);
 
