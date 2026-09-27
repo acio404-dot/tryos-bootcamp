@@ -4,7 +4,7 @@ import { TeacherName } from '@/components/TeacherTag';
 import LinkIdForm from '@/components/LinkIdForm';
 import { requireUser } from '@/lib/auth';
 import {
-  TZ, addDays, can, dowOfIso, eventsOf, groupsOfStudent, nowInTz, studentOfUser, upcomingLessons, withLessonInfo,
+  TZ, addDays, can, dowOfIso, eventsOf, groupsOfStudent, groupsOfTeacher, nowInTz, studentOfUser, teacherOfUser, upcomingLessons, withLessonInfo,
 } from '@/lib/data';
 import { DOW, dateRu, dateShort, whenRu } from '@/lib/format';
 
@@ -17,9 +17,12 @@ const KIND: Record<string, string> = { deadline: 'Сдать', lesson: 'Доп. 
 export default async function Schedule({ searchParams }: { searchParams: { w?: string } }) {
   const user = await requireUser();
   const student = await studentOfUser(user.id);
+  // Учитель без ID ученика видит неделю своих групп и индивидуальных занятий.
+  const teacher = student ? null : await teacherOfUser(user.id);
   const access = student?.access;
-  const allowed = Boolean(student && can(access, 'schedule'));
-  const groups = allowed ? await groupsOfStudent(student!.id) : [];
+  const allowed = Boolean((student && can(access, 'schedule')) || teacher);
+  const groups = teacher ? await groupsOfTeacher(teacher.id) : allowed ? await groupsOfStudent(student!.id) : [];
+  const who = student?.id ?? '-';
 
   const shift = Math.max(-12, Math.min(12, parseInt(searchParams?.w || '0', 10) || 0));
   const now = nowInTz();
@@ -31,12 +34,12 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
   };
 
   const events = allowed
-    ? await eventsOf(student!.id, groups.map((g) => g.id), `${addDays(monday, -1)}T00:00:00Z`, `${addDays(sunday, 2)}T00:00:00Z`)
+    ? await eventsOf(who, groups.map((g) => g.id), `${addDays(monday, -1)}T00:00:00Z`, `${addDays(sunday, 2)}T00:00:00Z`)
     : [];
   // «Ближайшие» — и занятия по расписанию, и назначенные отдельно
   // (доп. занятия, тестирования), в одном списке по времени.
   const soon = allowed
-    ? await eventsOf(student!.id, groups.map((g) => g.id), new Date().toISOString(), new Date(Date.now() + 14 * 86_400_000).toISOString())
+    ? await eventsOf(who, groups.map((g) => g.id), new Date().toISOString(), new Date(Date.now() + 14 * 86_400_000).toISOString())
     : [];
   const upcoming = [
     ...(await withLessonInfo(upcomingLessons(groups, 14, 8))).map((l) => ({
@@ -103,6 +106,7 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
       <div className="top">
         <div>
           <h1>Расписание</h1>
+          {teacher ? <p>Занятия твоих групп и индивидуальных учеников. Ссылки и доп. занятия — в <Link href="/teach">«Мои группы»</Link>.</p> : null}
           <p className="legend" style={{ marginTop: 8 }}>
             {groups.map((g) => (<span key={g.id}><span className="c-dot" style={{ background: color(g.id) }} />{g.course}</span>))}
             {allowed ? <span><span className="c-dot" style={{ background: 'var(--amber)' }} />Срок сдачи</span> : null}
@@ -117,7 +121,7 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
         ) : null}
       </div>
 
-      {!student ? (
+      {!student && !teacher ? (
         <div className="card empty-card">
           <h2>Привяжи ID ученика</h2>
           <p>Расписание твоих занятий появится здесь после привязки ID.</p>

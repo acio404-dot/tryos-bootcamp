@@ -373,7 +373,7 @@ function StudentRow({
         {st.user_id
           ? <span className="pill on" title={st.last_seen ? `Последний вход: ${short(st.last_seen)}` : undefined}>{account}</span>
           : <span className="pill warn">ждёт входа</span>}
-        <span className={`pill ${partial ? 'warn' : ''}`}>{partial ? 'частичный доступ' : 'полный доступ'}</span>
+        <span className={`pill ${partial ? 'warn' : 'acc-full'}`}>{partial ? 'частичный доступ' : 'полный доступ'}</span>
         <a className="btn btn-ghost btn-sm" href={`/students/${st.id}`}>Статистика</a>
         <button type="button" className="btn btn-ghost btn-sm" onClick={onToggle} aria-expanded={open}>{open ? 'Свернуть' : 'Открыть'}</button>
       </div>

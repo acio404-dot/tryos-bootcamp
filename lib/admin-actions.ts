@@ -153,8 +153,11 @@ export async function deleteStudent(id: string): Promise<AdminResult> {
   for (const g of solo) {
     await db`delete from bc_members where group_id = ${g.id}`;
     await db`delete from bc_events where group_id = ${g.id}`;
+    await db`delete from bc_lesson_info where group_id = ${g.id}`;
     await db`delete from bc_groups where id = ${g.id}`;
   }
+  // очные пробники ученика, который так и не вошёл, больше некому показать
+  await db`delete from bc_tests where student_id = ${id} and coalesce(user_id, '') = ''`;
   await db`delete from bc_members where student_id = ${id}`;
   await db`delete from bc_scores where student_id = ${id}`;
   await db`delete from bc_events where student_id = ${id}`;
