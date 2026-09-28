@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { studentOfUser } from '@/lib/data';
 import { streaksOf } from '@/lib/streak';
 import { mockBatches } from '@/lib/mock';
+import { botName, botReady, webhookInfo } from '@/lib/telegram';
 import { nowInTz } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,15 @@ export default async function Admin() {
   ]);
   for (const s of students as any[]) s.streak = s.user_id ? streaks[s.user_id] || 0 : 0;
 
+  const [hook, tgCount] = await Promise.all([
+    botReady() ? webhookInfo() : Promise.resolve(null),
+    db`select count(*)::int as n from bc_users where tg_chat_id is not null or tg_id is not null`,
+  ]);
+  const tg = {
+    ready: botReady(), bot: botName(), connected: tgCount[0]?.n ?? 0, cron: Boolean(process.env.CRON_SECRET),
+    webhook: hook ? { url: hook.url, error: hook.error } : null,
+  };
+
   return (
     <Shell user={user} student={me} active="admin">
       <div className="top">
@@ -63,6 +73,7 @@ export default async function Admin() {
         teachers={teachers as any}
         mocks={mocks}
         mockExams={mockExams}
+        tg={tg}
         today={nowInTz().date}
       />
     </Shell>

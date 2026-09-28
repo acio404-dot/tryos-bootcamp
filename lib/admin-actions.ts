@@ -11,6 +11,7 @@ import { db, one } from './db';
 import { currentUser, isAdmin } from './auth';
 import { TZONE, clean, dateOrNull, eventFields, intOrNull, scoreFields, slotsOf, url } from './fields';
 import { deleteMock, mockFields, saveMock, type MockInput } from './mock';
+import { notifyNewEvents } from './reminders';
 import { SECTIONS, makeStudentCode, makeTeacherCode, type Access, type Section, type Slot } from './data';
 
 export interface AdminResult { ok?: boolean; error?: string; id?: string }
@@ -340,8 +341,9 @@ export async function addEvent(input: { groupId?: number | null; studentId?: str
   const f = eventFields(input);
   if (typeof f === 'string') return { error: f };
   if (!input.groupId && !input.studentId) return { error: 'Выбери группу или ученика' };
-  await db`insert into bc_events (group_id, student_id, kind, title, at)
-    values (${input.groupId || null}, ${input.studentId || null}, ${f.kind}, ${f.title}, (${f.at}::timestamp at time zone ${TZONE()}))`;
+  const row = await one<{ id: number }>`insert into bc_events (group_id, student_id, kind, title, at)
+    values (${input.groupId || null}, ${input.studentId || null}, ${f.kind}, ${f.title}, (${f.at}::timestamp at time zone ${TZONE()})) returning id`;
+  if (row) await notifyNewEvents([row.id]);
   revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -388,6 +390,7 @@ export async function addEvents(input: EventInput): Promise<AdminResult> {
     for (const id of ids) await ins(null, id, 'target');
   }
 
+  await notifyNewEvents((await db<{ id: number }>`select id from bc_events where batch = ${batch}`).map((r) => r.id));
   revalidatePath('/', 'layout');
   return { ok: true, id: batch };
 }

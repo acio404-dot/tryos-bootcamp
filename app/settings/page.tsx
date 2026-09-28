@@ -5,6 +5,10 @@ import TelegramButton from '@/components/TelegramButton';
 import { PasswordForm, ProfileForm } from '@/components/SettingsForms';
 import { isAdmin, requireUser } from '@/lib/auth';
 import { SECTIONS, can, examOf, studentOfUser } from '@/lib/data';
+import NotifyCard from '@/components/NotifyCard';
+import { one } from '@/lib/db';
+import { NOTIFY } from '@/lib/reminders';
+import { botReady } from '@/lib/telegram';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Настройки' };
@@ -20,6 +24,10 @@ export default async function Settings({ searchParams }: { searchParams: { linke
   const exam = examOf(user, student);
   const googleOn = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
   const tgBot = process.env.TELEGRAM_BOT_TOKEN ? process.env.TELEGRAM_BOT_NAME : '';
+  const nt = await one<{ chat_id: string | null; notify: Record<string, boolean> | null }>`select tg_chat_id::text as chat_id, notify from bc_users where id = ${user.id}`;
+  // tg_id после выключения (/stop или «Отключить») не считаем подключением
+  const allOff = NOTIFY.every((n) => nt?.notify?.[n.key] === false);
+  const connected = Boolean(nt?.chat_id || (user.tg_id && !allOff));
 
   return (
     <Shell user={user} student={student} active="settings">
@@ -29,6 +37,12 @@ export default async function Settings({ searchParams }: { searchParams: { linke
       {searchParams?.error && ERRORS[searchParams.error] ? <p className="flash err">{ERRORS[searchParams.error]}</p> : null}
 
       <div className="grid g-2e">
+        <div className="card" id="notify">
+          <div className="card-head"><h2>Напоминания в Telegram</h2></div>
+          <NotifyCard ready={botReady()} connected={connected} viaLogin={Boolean(!nt?.chat_id && user.tg_id)}
+            prefs={nt?.notify || {}} items={NOTIFY} />
+        </div>
+
         <div className="card">
           <div className="card-head"><h2>Профиль и экзамен</h2></div>
           <ProfileForm
