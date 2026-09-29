@@ -1,5 +1,14 @@
 import Link from 'next/link';
+import { TOTAL_TOPICS } from '@/lib/bank';
 import { IArrow, ICheck, IFlame, ILock, IRedo, ITarget } from './icons';
+
+const topicsWord = (n: number) => {
+  const d = n % 10;
+  const dd = n % 100;
+  if (d === 1 && dd !== 11) return 'тема';
+  if (d >= 2 && d <= 4 && (dd < 12 || dd > 14)) return 'темы';
+  return 'тем';
+};
 
 const MODES = [
   {
@@ -10,7 +19,7 @@ const MODES = [
   {
     href: '/trainer', key: 'trainer', Icon: ICheck, title: 'Тренажёр по темам',
     text: 'Темы по учебникам Galata: задача — ответ — разбор сразу.',
-    meta: '82 темы',
+    meta: `${TOTAL_TOPICS} ${topicsWord(TOTAL_TOPICS)}`,
   },
   {
     href: '/mistakes', key: 'mistakes', Icon: IRedo, title: 'Работа над ошибками',
