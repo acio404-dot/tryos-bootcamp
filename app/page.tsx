@@ -9,6 +9,7 @@ import {
   addDays, can, eventsOf, examOf, groupsOfStudent, nowInTz, progressOf, scoresOf, studentOfUser, teacherOfUser, upcomingLessons, withLessonInfo,
 } from '@/lib/data';
 import { mistakeCount, myBestSurvival } from '@/lib/runs';
+import { topicInfo } from '@/lib/bank';
 import { streakOf } from '@/lib/streak';
 import StreakCard from '@/components/StreakCard';
 import { DOW_FULL, dateRu, firstName, plural } from '@/lib/format';
@@ -43,7 +44,8 @@ export default async function Home() {
   const lastScore = progress.tests[0]?.score ?? null;
   const prevMonth = progress.tests.find((t) => t.at <= addDays(now.date, -28));
   const weak = progress.topics
-    .filter((t) => t.total >= 5)
+    // темы, снятые с выдачи (их нет на экзамене), в «подтянуть» не предлагаем
+    .filter((t) => t.total >= 5 && topicInfo(t.topic))
     .map((t) => ({ ...t, pct: Math.round((t.ok / t.total) * 100) }))
     .sort((a, b) => a.pct - b.pct)
     .slice(0, 4);
