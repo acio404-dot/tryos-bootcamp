@@ -18,6 +18,13 @@ import pr1 from '@/content/bank-v2-practice-1.json';
 import pr2 from '@/content/bank-v2-practice-2.json';
 import pr3 from '@/content/bank-v2-practice-3.json';
 import pr4 from '@/content/bank-v2-practice-4.json';
+// Банк v3 (сентябрь 2026): +2000 новых задач, по нескольку разных типов на каждую тему.
+import v3p1 from '@/content/bank-v3-practice-algebra.json';
+import v3p2 from '@/content/bank-v3-practice-geometry.json';
+import v3p3 from '@/content/bank-v3-practice-iq.json';
+import v3e1 from '@/content/bank-v3-exam-algebra.json';
+import v3e2 from '@/content/bank-v3-exam-geometry.json';
+import v3e3 from '@/content/bank-v3-exam-iq.json';
 
 import {
   FORMATS, SECTION_BOOK, SECTION_LABEL, formatByKey,
@@ -36,17 +43,43 @@ export interface Item {
   explanation: string;
   figure?: string;
   difficulty?: string;
+  /** Тип задачи внутри темы (генератор). У старых задач его заменяет код в id. */
+  family?: string;
 }
 
-const asItems = (v: unknown) => v as unknown as Item[];
+/* Мелкие огрехи разметки в старых файлах: дважды экранированные сущности
+   (&amp;rarr; вместо стрелки) и теги <sup> в вариантах ответа, которые
+   показываются как обычный текст. Чиним при загрузке, не трогая JSON. */
+const SUP: Record<string, string> = {
+  '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+  '+': '⁺', '-': '⁻', '−': '⁻', n: 'ⁿ', x: 'ˣ',
+};
+const fixEntities = (s: string) => s.replace(/&amp;(#\d+|[a-zA-Z]+);/g, '&$1;');
+const fixOption = (s: string) =>
+  s
+    .replace(/<sup>([^<]*)<\/sup>/g, (_m, d: string) => [...d].map((c) => SUP[c] ?? c).join(''))
+    .replace(/<[^>]+>/g, '')
+    .replace(/&#(\d+);/g, (_m, n: string) => String.fromCharCode(Number(n)));
+
+function tidy(q: Item): Item {
+  const text = fixEntities(q.text);
+  const explanation = fixEntities(q.explanation);
+  const options = q.options.map(fixOption);
+  if (text === q.text && explanation === q.explanation && options.every((o, i) => o === q.options[i])) return q;
+  return { ...q, text, explanation, options };
+}
+
+const asItems = (v: unknown) => (v as unknown as Item[]).map(tidy);
 
 export const PRACTICE: Item[] = [
   ...asItems(pr1), ...asItems(pr2), ...asItems(pr3), ...asItems(pr4),
+  ...asItems(v3p1), ...asItems(v3p2), ...asItems(v3p3),
 ];
 
 export const EXAM: Item[] = [
   ...asItems(ex1), ...asItems(ex2), ...asItems(ex3),
   ...asItems(ex4), ...asItems(ex5), ...asItems(ex6),
+  ...asItems(v3e1), ...asItems(v3e2), ...asItems(v3e3),
 ];
 
 /** Задача по id — ищем в обоих банках. */
@@ -74,6 +107,7 @@ const ORDER: Record<Section, [string, string][]> = {
     ['sifre', 'ŞİFRELER · с. 5'],
     ['numseq', 'SAYI DİZİLERİ · с. 29'],
     ['numfig', 'SAYI BAĞINTILARI · с. 107'],
+    ['num_rule', 'SAYI BAĞINTILARI · с. 107'],
     ['optable', 'TABLOLAR · с. 153'],
     ['tablo', 'TABLOLAR: işlem tablosu · с. 153'],
     ['balance', 'TERAZİLER · с. 185'],
@@ -87,9 +121,13 @@ const ORDER: Record<Section, [string, string][]> = {
     ['fig_table', 'ŞEKİL TABLOLARI · с. 323'],
     ['fig_series', 'ŞEKİL SIRALAMA · с. 353'],
     ['fig_compare', 'FARKLI OLAN ŞEKLİ BULMA · с. 373'],
+    ['odd_one', 'FARKLI OLAN ŞEKLİ BULMA · с. 373'],
+    ['rotate', EXAM_SOURCE],
+    ['fig_ops', EXAM_SOURCE],
     ['cube_net', '3 BOYUTLU CİSİMLER · с. 399'],
     ['paper_fold', 'KAĞIT KESME-KATLAMA · с. 409'],
     ['tri_count', 'ÜÇGEN SAYMA · с. 417'],
+    ['fig_count', 'ÜÇGEN SAYMA · с. 417'],
     ['clock', 'SAAT · с. 427'],
     ['magic', 'SUDOKU: sihirli kare · с. 433'],
     ['sudoku', 'SUDOKU · с. 433'],
@@ -104,10 +142,12 @@ const ORDER: Record<Section, [string, string][]> = {
     ['exponent', 'Üslü İfadeler · с. 49'],
     ['radical', 'Köklü İfadeler · с. 67'],
     ['factor', 'Çarpanlara Ayırma · с. 91'],
+    ['polinom', EXAM_SOURCE],
     ['system', 'Çarpanlara Ayırma · с. 104'],
     ['inequality', 'Basit Eşitsizlik · с. 113'],
     ['absolute', 'Mutlak Değer · с. 125'],
     ['digits_num', 'Taban Aritmetiği · с. 141'],
+    ['kripto', EXAM_SOURCE],
     ['taban', 'Taban Aritmetiği: sayı sistemleri · с. 141'],
     ['series', 'Sayılar · с. 153'],
     ['digits', 'Sayılar: bölünebilme · с. 153'],
@@ -116,6 +156,7 @@ const ORDER: Record<Section, [string, string][]> = {
     ['sets', 'Kümeler · с. 195'],
     ['kartezyen', 'Kartezyen Çarpım · с. 221'],
     ['fonksiyon', 'Fonksiyonlar · с. 229'],
+    ['grafik', 'Fonksiyonlar · с. 229'],
     ['operation', 'İşlem · с. 255'],
     ['modular', 'Modüler Aritmetik · с. 269'],
     ['percent', 'Problemler: yüzde · с. 283'],
@@ -156,7 +197,7 @@ const ORDER: Record<Section, [string, string][]> = {
     ['circle_area', 'Dairede Alan · с. 409'],
     ['analytic', 'Analitik Geometri · с. 429'],
     ['simetri', 'Simetri · с. 475'],
-    ['cember', 'Çemberin Analitiği · с. 487'],
+    ['cember_analitik', 'Çemberin Analitiği · с. 487'],
   ],
 };
 
@@ -276,15 +317,44 @@ function shuffle<T>(list: T[]): T[] {
   return a;
 }
 
-/** Задачи темы в случайном порядке; «mix-algebra» — по кругу из всех тем раздела. */
+/** Тип задачи: поле family, иначе код генератора из id (P-IQ-WH-…, IQ-NR-…). */
+function familyOf(q: Item): string {
+  if (q.family) return q.family;
+  const parts = q.id.split('-');
+  if ((parts[0] === 'P' || parts[0] === 'E') && parts.length > 3) return parts[2];
+  return parts.length > 2 ? parts[1] : q.id;
+}
+
+/**
+ * Случайный порядок, в котором типы задач чередуются по кругу: сначала по одной
+ * задаче каждого типа, потом по второй и т. д. Так в подборке из 20 задач
+ * встречаются все типы темы, а не 20 вариаций одного шаблона.
+ */
+function diversified(list: Item[]): Item[] {
+  const byFamily = new Map<string, Item[]>();
+  for (const q of list) {
+    const k = familyOf(q);
+    const l = byFamily.get(k) || [];
+    l.push(q);
+    byFamily.set(k, l);
+  }
+  const lists = shuffle([...byFamily.values()].map((l) => shuffle(l)));
+  const out: Item[] = [];
+  for (let round = 0; out.length < list.length; round++) {
+    for (const l of lists) if (l[round]) out.push(l[round]);
+  }
+  return out;
+}
+
+/** Задачи темы в случайном порядке (типы чередуются); «mix-algebra» — по кругу из всех тем раздела. */
 export function topicQuestions(key: string, limit = 20): PublicQuestion[] {
   const info = topicInfo(key);
   if (!info) return [];
-  if (!info.mixed) return shuffle(BY_TOPIC.get(info.key) || []).slice(0, limit).map(toPublic);
+  if (!info.mixed) return diversified(BY_TOPIC.get(info.key) || []).slice(0, limit).map(toPublic);
 
   const group = CATALOG.find((g) => g.key === info.section);
   if (!group) return [];
-  const pools = shuffle(group.topics).map((t) => shuffle(BY_TOPIC.get(t.key) || []));
+  const pools = shuffle(group.topics).map((t) => diversified(BY_TOPIC.get(t.key) || []));
   const out: Item[] = [];
   for (let round = 0; out.length < limit && round < 60; round++) {
     for (const pool of pools) {
@@ -308,7 +378,7 @@ function spread(pool: Item[], n: number): Item[] {
     l.push(q);
     byTopic.set(q.topic, l);
   }
-  const lists = shuffle([...byTopic.values()].map((l) => shuffle(l)));
+  const lists = shuffle([...byTopic.values()].map((l) => diversified(l)));
   const out: Item[] = [];
   for (let round = 0; out.length < n && round < 200; round++) {
     for (const l of lists) {
