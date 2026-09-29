@@ -25,6 +25,8 @@ import v3p3 from '@/content/bank-v3-practice-iq.json';
 import v3e1 from '@/content/bank-v3-exam-algebra.json';
 import v3e2 from '@/content/bank-v3-exam-geometry.json';
 import v3e3 from '@/content/bank-v3-exam-iq.json';
+// Снятые с выдачи задачи: темы, которых нет на экзамене, и слишком лёгкие шаблоны.
+import retired from '@/content/bank-retired.json';
 
 import {
   FORMATS, SECTION_BOOK, SECTION_LABEL, formatByKey,
@@ -61,31 +63,54 @@ const fixOption = (s: string) =>
     .replace(/<[^>]+>/g, '')
     .replace(/&#(\d+);/g, (_m, n: string) => String.fromCharCode(Number(n)));
 
+/* Названия тем, из которых ушла часть задач (календарные задачи сняты с выдачи). */
+const LABEL: Record<string, string> = { clock: 'Часы' };
+
 function tidy(q: Item): Item {
   const text = fixEntities(q.text);
   const explanation = fixEntities(q.explanation);
   const options = q.options.map(fixOption);
-  if (text === q.text && explanation === q.explanation && options.every((o, i) => o === q.options[i])) return q;
-  return { ...q, text, explanation, options };
+  const topicLabel = LABEL[q.topic] ?? q.topicLabel;
+  if (text === q.text && explanation === q.explanation && topicLabel === q.topicLabel
+    && options.every((o, i) => o === q.options[i])) return q;
+  return { ...q, text, explanation, options, topicLabel };
 }
 
 const asItems = (v: unknown) => (v as unknown as Item[]).map(tidy);
 
-export const PRACTICE: Item[] = [
+const ALL_PRACTICE: Item[] = [
   ...asItems(pr1), ...asItems(pr2), ...asItems(pr3), ...asItems(pr4),
   ...asItems(v3p1), ...asItems(v3p2), ...asItems(v3p3),
 ];
 
-export const EXAM: Item[] = [
+const ALL_EXAM: Item[] = [
   ...asItems(ex1), ...asItems(ex2), ...asItems(ex3),
   ...asItems(ex4), ...asItems(ex5), ...asItems(ex6),
   ...asItems(v3e1), ...asItems(v3e2), ...asItems(v3e3),
 ];
 
-/** Задача по id — ищем в обоих банках. */
+/* Снятые с выдачи задачи (content/bank-retired.json): сравнения по модулю,
+   системы счисления, все текстовые задачи — их нет на экзамене, — и слишком
+   лёгкие шаблоны. Они не попадают ни в тренажёр, ни в пробники, ни в выживание,
+   ни в работу над ошибками, но остаются в BY_ID: старые результаты и история
+   попыток открываются как раньше. */
+const RETIRED_TOPICS = new Set<string>(retired.topics);
+const RETIRED_IDS = new Set<string>(retired.groups.flatMap((g) => g.ids));
+const isRetired = (q: Item) => RETIRED_TOPICS.has(q.topic) || RETIRED_IDS.has(q.id);
+
+export const PRACTICE: Item[] = ALL_PRACTICE.filter((q) => !isRetired(q));
+export const EXAM: Item[] = ALL_EXAM.filter((q) => !isRetired(q));
+
+/** Задача по id — ищем в обоих банках, включая снятые с выдачи. */
 const BY_ID = new Map<string, Item>();
-for (const q of PRACTICE) BY_ID.set(q.id, q);
-for (const q of EXAM) BY_ID.set(q.id, q);
+for (const q of ALL_PRACTICE) BY_ID.set(q.id, q);
+for (const q of ALL_EXAM) BY_ID.set(q.id, q);
+
+/** Задача есть в банке и выдаётся ученикам (не снята с выдачи). */
+export function isActiveId(id: string): boolean {
+  const q = BY_ID.get(id);
+  return Boolean(q && !isRetired(q));
+}
 
 const BY_TOPIC = new Map<string, Item[]>();
 for (const q of PRACTICE) {
@@ -479,7 +504,7 @@ export function gradeExam(ids: string[], answers: (number | null)[]): ExamResult
     iq,
     math,
     score,
-    weak: stats.filter((e) => acc(e) < 0.6).sort((a, b) => acc(a) - acc(b) || b.total - a.total).slice(0, 5),
+    weak: stats.filter((e) => acc(e) < 0.6 && BY_TOPIC.has(e.topic)).sort((a, b) => acc(a) - acc(b) || b.total - a.total).slice(0, 5),
     strong: stats.filter((e) => acc(e) >= 0.8 && e.total >= 2).sort((a, b) => acc(b) - acc(a)).slice(0, 3),
   };
 }

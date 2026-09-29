@@ -5,7 +5,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { db, one } from './db';
-import { checkAnswer, type Section } from './bank';
+import { checkAnswer, isActiveId, type Section } from './bank';
 
 export const newId = () => randomBytes(9).toString('base64url');
 
@@ -47,10 +47,11 @@ export interface MistakeRow {
 
 /**
  * Задачи, где последняя попытка оказалась неверной. Решил её потом правильно —
- * задача уходит из списка сама.
+ * задача уходит из списка сама. Задачи, снятые с выдачи (их нет на экзамене
+ * или они слишком лёгкие), сюда не попадают.
  */
 export async function mistakesOf(userId: string, limit = 40): Promise<MistakeRow[]> {
-  return db<MistakeRow>`
+  const rows = await db<MistakeRow>`
     with last as (
       select distinct on (question_id) question_id, topic, topic_label, section, correct, created_at
       from bc_attempts
@@ -64,19 +65,20 @@ export async function mistakesOf(userId: string, limit = 40): Promise<MistakeRow
     from last l
     where l.correct = false
     order by l.created_at desc
-    limit ${limit}`;
+    limit ${limit * 3 + 60}`;
+  return rows.filter((r) => isActiveId(r.question_id)).slice(0, limit);
 }
 
 export async function mistakeCount(userId: string): Promise<number> {
-  const r = await one<{ n: number }>`
+  const rows = await db<{ question_id: string }>`
     with last as (
       select distinct on (question_id) question_id, correct
       from bc_attempts
       where user_id = ${userId} and question_id is not null
       order by question_id, created_at desc
     )
-    select count(*)::int as n from last where correct = false`;
-  return r?.n ?? 0;
+    select question_id from last where correct = false`;
+  return rows.filter((r) => isActiveId(r.question_id)).length;
 }
 
 /* -------------------------------------------------------------- пробник */
