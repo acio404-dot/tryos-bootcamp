@@ -18,7 +18,7 @@ const MODES = [
   },
   {
     href: '/trainer', key: 'trainer', Icon: ICheck, title: 'Тренажёр по темам',
-    text: 'Темы по учебникам Galata: задача — ответ — разбор сразу.',
+    text: 'Все темы экзамена: задача — ответ — разбор сразу.',
     meta: `${TOTAL_TOPICS} ${topicsWord(TOTAL_TOPICS)}`,
   },
   {
