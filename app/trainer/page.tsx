@@ -21,7 +21,7 @@ export default async function Trainer() {
       <div className="top">
         <div>
           <h1>Тренажёр</h1>
-          <p>Темы идут в том же порядке, что в учебниках Galata. Задачи по одной: выбери ответ,
+          <p>Все темы экзамена по трём разделам. Задачи по одной: выбери ответ,
             нажми «Проверить» — и сразу увидишь правильный вариант и разбор.</p>
         </div>
         <div className="top-actions">
@@ -33,7 +33,7 @@ export default async function Trainer() {
       </div>
 
       <div className="tiles">
-        <div className="tile"><b>{TOTAL_TOPICS}</b><i>тем по трём учебникам</i></div>
+        <div className="tile"><b>{TOTAL_TOPICS}</b><i>тем в трёх разделах</i></div>
         <div className="tile"><b>{TOTAL_PRACTICE}</b><i>задач с разбором</i></div>
         <div className="tile"><b>{mistakes}</b><i>{plural(mistakes, 'задача ждёт', 'задачи ждут', 'задач ждут')} в работе над ошибками</i></div>
       </div>
