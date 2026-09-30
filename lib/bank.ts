@@ -112,11 +112,24 @@ export function isActiveId(id: string): boolean {
   return Boolean(q && !isRetired(q));
 }
 
+/* Задачи тренажёра по id, включая снятые с выдачи. Задач пробников здесь нет:
+   через открытое API сайта (lib/public-bank.ts) они не отдаются никогда. */
+const PRACTICE_IDS = new Set(ALL_PRACTICE.map((q) => q.id));
+
+export function practiceItem(id: string): Item | undefined {
+  return PRACTICE_IDS.has(id) ? BY_ID.get(id) : undefined;
+}
+
 const BY_TOPIC = new Map<string, Item[]>();
 for (const q of PRACTICE) {
   const list = BY_TOPIC.get(q.topic) || [];
   list.push(q);
   BY_TOPIC.set(q.topic, list);
+}
+
+/** Выдаваемые задачи тренажёра по теме. */
+export function practiceByTopic(key: string): Item[] {
+  return BY_TOPIC.get(key) || [];
 }
 
 export const TOTAL_PRACTICE = PRACTICE.length;
