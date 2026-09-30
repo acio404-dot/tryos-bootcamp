@@ -25,6 +25,14 @@ import v3p3 from '@/content/bank-v3-practice-iq.json';
 import v3e1 from '@/content/bank-v3-exam-algebra.json';
 import v3e2 from '@/content/bank-v3-exam-geometry.json';
 import v3e3 from '@/content/bank-v3-exam-iq.json';
+// Банк v4 (октябрь 2026): последние форматы TR-YÖS (цепочка диаграмм, кольца, часы, развёртки,
+// складывание) и добор тонких тем — часы, подсчёт фигур, пропорции, делимость, Виет, системы, дельтоид.
+import v4p1 from '@/content/bank-v4-practice-algebra.json';
+import v4p2 from '@/content/bank-v4-practice-geometry.json';
+import v4p3 from '@/content/bank-v4-practice-iq.json';
+import v4e1 from '@/content/bank-v4-exam-algebra.json';
+import v4e2 from '@/content/bank-v4-exam-geometry.json';
+import v4e3 from '@/content/bank-v4-exam-iq.json';
 // Снятые с выдачи задачи: темы, которых нет на экзамене, и слишком лёгкие шаблоны.
 import retired from '@/content/bank-retired.json';
 
@@ -63,8 +71,13 @@ const fixOption = (s: string) =>
     .replace(/<[^>]+>/g, '')
     .replace(/&#(\d+);/g, (_m, n: string) => String.fromCharCode(Number(n)));
 
-/* Названия тем, из которых ушла часть задач (календарные задачи сняты с выдачи). */
-const LABEL: Record<string, string> = { clock: 'Часы' };
+/* Названия тем, которые изменились: из «часов» ушли календарные задачи, в «развёртках» появились
+   кубики, которые катятся, и виды одного кубика, в «поворотах» — отражения в зеркалах. */
+const LABEL: Record<string, string> = {
+  clock: 'Часы',
+  cube_net: 'Кубики и развёртки',
+  rotate: 'Повороты и отражения',
+};
 
 function tidy(q: Item): Item {
   const text = fixEntities(q.text);
@@ -81,12 +94,14 @@ const asItems = (v: unknown) => (v as unknown as Item[]).map(tidy);
 const ALL_PRACTICE: Item[] = [
   ...asItems(pr1), ...asItems(pr2), ...asItems(pr3), ...asItems(pr4),
   ...asItems(v3p1), ...asItems(v3p2), ...asItems(v3p3),
+  ...asItems(v4p1), ...asItems(v4p2), ...asItems(v4p3),
 ];
 
 const ALL_EXAM: Item[] = [
   ...asItems(ex1), ...asItems(ex2), ...asItems(ex3),
   ...asItems(ex4), ...asItems(ex5), ...asItems(ex6),
   ...asItems(v3e1), ...asItems(v3e2), ...asItems(v3e3),
+  ...asItems(v4e1), ...asItems(v4e2), ...asItems(v4e3),
 ];
 
 /* Снятые с выдачи задачи (content/bank-retired.json): сравнения по модулю,
