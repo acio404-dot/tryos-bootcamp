@@ -1,7 +1,7 @@
 import Shell from '@/components/Shell';
 import AdminPanel from '@/components/AdminPanel';
 import { requireAdmin } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, dbUrl } from '@/lib/db';
 import { studentOfUser } from '@/lib/data';
 import { streaksOf } from '@/lib/streak';
 import { mockBatches } from '@/lib/mock';
@@ -50,6 +50,15 @@ export default async function Admin() {
     botReady() ? webhookInfo() : Promise.resolve(null),
     db`select count(*)::int as n from bc_users where tg_chat_id is not null or tg_id is not null`,
   ]);
+  // Диагностика скорости: где работает сайт, где база и сколько идёт один запрос к ней.
+  const pings: number[] = [];
+  for (let i = 0; i < 3; i++) { const t = Date.now(); await db`select 1`; pings.push(Date.now() - t); }
+  const host = (() => { try { return new URL(dbUrl()).host; } catch { return ''; } })();
+  const server = {
+    fn: process.env.VERCEL_REGION || '',
+    db: host.match(/\.([a-z]{2}-[a-z]+-\d)\.aws\.neon/)?.[1] || host.match(/\.(azure[a-z-]*|[a-z]+-[a-z]+\d?)\.(?:azure\.)?neon/)?.[1] || '',
+    ping: pings.sort((a, b) => a - b)[1],
+  };
   const tg = {
     ready: botReady(), bot: botName(), connected: tgCount[0]?.n ?? 0, cron: Boolean(process.env.CRON_SECRET),
     webhook: hook ? { url: hook.url, error: hook.error } : null,
@@ -74,6 +83,7 @@ export default async function Admin() {
         mocks={mocks}
         mockExams={mockExams}
         tg={tg}
+        server={server}
         today={nowInTz().date}
       />
     </Shell>

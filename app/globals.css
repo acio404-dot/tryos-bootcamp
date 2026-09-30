@@ -4,8 +4,8 @@
   --paper:#F4F7FB;--paper-2:#E9EFF6;--ink:#0B1626;--ink-2:#2A3B51;--muted:#6C7F96;--line:rgba(11,22,38,.08);
   --r-lg:22px;--r-md:16px;--r-sm:12px;
   --shadow:0 12px 34px -18px rgba(5,16,32,.35);
-  --font:'Manrope',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
-  --display:'Unbounded','Manrope',system-ui,sans-serif;
+  --font:var(--f-text,'Manrope'),system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  --display:var(--f-display,'Unbounded'),var(--f-text,'Manrope'),system-ui,sans-serif;
 }
 *{box-sizing:border-box}
 html,body{margin:0}
@@ -979,3 +979,9 @@ button{font:inherit;cursor:pointer}
 .nt-row i{display:block;font-style:normal;font-size:12.5px;color:var(--muted)}
 .tg-steps{margin:0;padding-left:20px;display:grid;gap:8px;color:var(--ink-2);line-height:1.55}
 .tg-steps code{font-size:.88em;background:var(--paper-2);padding:1px 6px;border-radius:6px;word-break:break-all}
+
+/* полоска загрузки при переходе между страницами */
+.navp{position:fixed;left:0;top:0;height:3px;z-index:100;background:linear-gradient(90deg,var(--teal),var(--teal-2));box-shadow:0 0 8px rgba(60,200,192,.6);pointer-events:none}
+.navp-run{width:85%;transition:width 8s cubic-bezier(.1,.7,.2,1);animation:navp-in .25s ease-out}
+.navp-done{width:100%;opacity:0;transition:width .2s ease-out,opacity .3s ease .15s}
+@keyframes navp-in{from{width:0}to{width:30%}}

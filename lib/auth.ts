@@ -8,6 +8,7 @@
  * Пароли хранятся только как scrypt-хеш с солью.
  */
 
+import { cache } from 'react';
 import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -125,19 +126,22 @@ export function isAdmin(u: (Pick<User, 'role' | 'username'> & Partial<Pick<User,
   return ids.some((x) => list.includes(x));
 }
 
-export async function currentUser(): Promise<User | null> {
+/** Кто вошёл. cache — один запрос к базе на всю страницу, сколько бы раз ни спросили. */
+export const currentUser = cache(async (): Promise<User | null> => {
   if (!hasDb()) return null;
   const s = verify<{ u: string }>(cookies().get(SESSION_COOKIE)?.value);
   if (!s?.u) return null;
-  const u = await one<User>`select id, username, name, email, google_sub, tg_id::text as tg_id, tg_username, role,
-    exam_name, to_char(exam_date, 'YYYY-MM-DD') as exam_date, pass_hash
+  const u = await one<User & { stale?: boolean }>`select id, username, name, email, google_sub, tg_id::text as tg_id, tg_username, role,
+    exam_name, to_char(exam_date, 'YYYY-MM-DD') as exam_date, pass_hash,
+    (last_seen is null or last_seen < now() - interval '5 minutes') as stale
     from bc_users where id = ${s.u}`;
-  if (u) {
-    // отмечаем визит не чаще, чем нужно: достаточно раз за запрос страницы
+  if (u?.stale) {
+    // отмечаем визит не чаще раза в 5 минут — лишняя запись на каждый клик не нужна
     db`update bc_users set last_seen = now() where id = ${u.id}`.catch(() => {});
   }
+  if (u) delete u.stale;
   return u;
-}
+});
 
 /** Для страниц кабинета: нет входа — на /login. */
 export async function requireUser(): Promise<User> {
