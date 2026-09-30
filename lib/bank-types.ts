@@ -27,7 +27,7 @@ export interface Topic {
   key: string;
   label: string;
   section: Section;
-  /** Раздел учебника: «TERAZİLER · с. 185». */
+  /** Турецкое название темы: «Teraziler». */
   source: string;
   count: number;
   /** «Вперемешку» — задачи из всех тем раздела. */
@@ -47,16 +47,17 @@ export const SECTION_LABEL: Record<Section, string> = {
   geometry: 'Геометрия',
 };
 
+/** Часть экзамена TR-YÖS, к которой относится раздел. */
 export const SECTION_BOOK: Record<Section, string> = {
-  iq: 'Galata IQ',
-  algebra: 'Galata Mat-1',
-  geometry: 'Galata Geometri',
+  iq: 'Sayısal Yetenek',
+  algebra: 'Temel Matematik',
+  geometry: 'Temel Matematik',
 };
 
-/** Где тема в учебнике: «Galata IQ · TERAZİLER · с. 185». */
+/** Подпись темы: часть экзамена и турецкое название темы — «Sayısal Yetenek · Teraziler». */
 export function sourceLine(t: Pick<Topic, 'section' | 'source' | 'mixed'>): string {
   if (t.mixed) return `${SECTION_BOOK[t.section]} · все темы раздела`;
-  if (!/с\. \d/.test(t.source)) return 'Тип задач с экзаменов TR-YÖS';
+  if (!t.source || /экзамен/.test(t.source)) return 'Тип задач с экзаменов TR-YÖS';
   return `${SECTION_BOOK[t.section]} · ${t.source}`;
 }
 
@@ -90,7 +91,7 @@ export const FORMATS: FormatSpec[] = [
   },
   {
     key: 'iq', title: 'Только логика', iq: 40, math: 0, minutes: 50,
-    note: 'Сорок задач Galata IQ с таймером — тренировать скорость в разделе.',
+    note: 'Сорок задач на логику с таймером — тренировать скорость в разделе.',
   },
   {
     key: 'math', title: 'Только математика', iq: 0, math: 40, minutes: 50,
