@@ -2,6 +2,7 @@
  * Данные кабинета: ученик по ID, группы и расписание, баллы, прогресс.
  */
 
+import { cache } from 'react';
 import { randomInt } from 'node:crypto';
 import { db, one } from './db';
 import type { User } from './auth';
@@ -25,10 +26,10 @@ export interface Student {
   user_id: string | null;
 }
 
-export async function studentOfUser(userId: string): Promise<Student | null> {
-  return one<Student>`select id, name, phone, note, access, exam_name, to_char(exam_date, 'YYYY-MM-DD') as exam_date,
-    exam_city, target_score, user_id from bc_students where user_id = ${userId}`;
-}
+/** cache — один запрос на страницу, даже если ученика спрашивают и страница, и меню. */
+export const studentOfUser = cache(async (userId: string): Promise<Student | null> =>
+  one<Student>`select id, name, phone, note, access, exam_name, to_char(exam_date, 'YYYY-MM-DD') as exam_date,
+    exam_city, target_score, user_id from bc_students where user_id = ${userId}`);
 
 /* -------------------------------------------------------------- экзамен */
 
@@ -288,9 +289,8 @@ export const TEACHER_CODE = /^TZT-\d{4}-[A-Z0-9]{4}$/;
 
 export interface Teacher { id: string; name: string; phone: string | null; note: string | null; user_id: string | null }
 
-export async function teacherOfUser(userId: string): Promise<Teacher | null> {
-  return one<Teacher>`select id, name, phone, note, user_id from bc_teachers where user_id = ${userId}`;
-}
+export const teacherOfUser = cache(async (userId: string): Promise<Teacher | null> =>
+  one<Teacher>`select id, name, phone, note, user_id from bc_teachers where user_id = ${userId}`);
 
 /** Группы и индивидуальные занятия, которые ведёт учитель. */
 export async function groupsOfTeacher(teacherId: string): Promise<Group[]> {

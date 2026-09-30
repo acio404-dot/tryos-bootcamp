@@ -186,7 +186,7 @@ const invite = (id: string, name: string) =>
 /* ============================================================ панель */
 
 export default function AdminPanel({
-  students, groups, members, scores, events, teachers, mocks, mockExams, today, tg,
+  students, groups, members, scores, events, teachers, mocks, mockExams, today, tg, server,
 }: {
   students: AStudent[];
   groups: AGroup[];
@@ -198,8 +198,9 @@ export default function AdminPanel({
   mockExams: { title: string; day: string; group_id: number | null }[];
   today: string;
   tg: TgInfo;
+  server: ServerInfo;
 }) {
-  const [tab, setTab] = useState<'students' | 'teachers' | 'group' | 'solo' | 'events' | 'mocks' | 'exam' | 'tg'>('students');
+  const [tab, setTab] = useState<'students' | 'teachers' | 'group' | 'solo' | 'events' | 'mocks' | 'exam' | 'tg' | 'server'>('students');
   const inGroups = groups.filter((g) => !isSolo(g));
   const solos = groups.filter(isSolo);
   const planned = events.filter((e) => e.batch).length;
@@ -231,9 +232,14 @@ export default function AdminPanel({
         <button type="button" role="tab" aria-selected={tab === 'tg'} className={tab === 'tg' ? 'on' : ''} onClick={() => setTab('tg')}>
           Telegram{tg.ready && tg.webhook?.url ? '' : ' · !'}
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'server'} className={tab === 'server' ? 'on' : ''} onClick={() => setTab('server')}>
+          Сервер{server.ping > 60 ? ' · !' : ''}
+        </button>
       </div>
       {tab === 'students' ? (
         <StudentsTab students={students} groups={groups} members={members} scores={scores} events={events} />
+      ) : tab === 'server' ? (
+        <ServerTab s={server} />
       ) : tab === 'tg' ? (
         <TgTab tg={tg} />
       ) : tab === 'mocks' ? (
@@ -1064,6 +1070,44 @@ function PlanRow({ plan, who }: { plan: Plan; who: string }) {
         >Удалить</button>
       </div>
       {act.error ? <p className="err" style={{ margin: '0 0 10px' }}>{act.error}</p> : null}
+    </div>
+  );
+}
+
+/* ============================================================ сервер */
+
+export interface ServerInfo { fn: string; db: string; ping: number }
+
+// Регионы Vercel (где работает сайт) и Neon (где база), которые находятся рядом.
+const NEAR: Record<string, string[]> = {
+  fra1: ['eu-central-1'], cdg1: ['eu-west-3', 'eu-central-1'], lhr1: ['eu-west-2'], arn1: ['eu-north-1', 'eu-central-1'],
+  iad1: ['us-east-1', 'us-east-2'], cle1: ['us-east-2', 'us-east-1'], sfo1: ['us-west-2'], pdx1: ['us-west-2'],
+  sin1: ['ap-southeast-1'], syd1: ['ap-southeast-2'], hnd1: ['ap-northeast-1'], bom1: ['ap-south-1'],
+};
+
+function ServerTab({ s }: { s: ServerInfo }) {
+  const same = s.fn && s.db ? (NEAR[s.fn] || []).includes(s.db) : null;
+  const fast = s.ping <= 30;
+  return (
+    <div className="card">
+      <div className="card-head"><h2>Скорость сервера</h2></div>
+      <ul className="mini-list" style={{ marginTop: 0 }}>
+        <li><span>Где работает сайт (Vercel)</span><span className="pill">{s.fn || 'не Vercel'}</span></li>
+        <li><span>Где база (Neon)</span><span className="pill">{s.db || 'не определить'}</span></li>
+        <li><span>Один запрос к базе</span><span className={`pill ${fast ? 'on' : 'warn'}`}>{s.ping} мс</span></li>
+      </ul>
+      {same === false ? (
+        <p className="err" style={{ marginTop: 12 }}>
+          Сайт и база в разных регионах: каждый запрос к базе идёт через океан, а на странице их 6–15. Это главная причина медленных ответов.
+          Лучше всего держать базу Neon в Франкфурте (AWS eu-central-1) — рядом с сайтом (fra1) и ближе всего к ученикам.
+        </p>
+      ) : same ? (
+        <p className="okmsg" style={{ marginTop: 12 }}>Сайт и база в одном регионе — хорошо.</p>
+      ) : null}
+      <p className="muted" style={{ marginTop: 12, fontSize: 13.5 }}>
+        Хорошо — до 30 мс на запрос. Если база долго не использовалась, Neon «засыпает»: первый запрос после паузы идёт 0,5–2 секунды.
+        На платном тарифе Neon это отключается (Compute → Scale to zero).
+      </p>
     </div>
   );
 }

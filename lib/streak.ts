@@ -5,6 +5,7 @@
  * или вчера: вчерашний стрик ещё можно продлить сегодня.
  */
 
+import { cache } from 'react';
 import { db, one } from './db';
 import { addDays, nowInTz, TZ } from './data';
 
@@ -41,7 +42,8 @@ function longest(sorted: string[]): number {
   return best;
 }
 
-export async function streakOf(userId: string): Promise<StreakInfo> {
+/** cache — стрик нужен и странице, и меню (огонёк у имени): считаем один раз. */
+export const streakOf = cache(async (userId: string): Promise<StreakInfo> => {
   const rows = await db<{ d: string }>`select distinct to_char(created_at at time zone ${TZ}, 'YYYY-MM-DD') as d
     from bc_attempts where user_id = ${userId} and created_at > now() - interval '370 days' order by d`;
   const date = nowInTz().date;
@@ -57,7 +59,7 @@ export async function streakOf(userId: string): Promise<StreakInfo> {
     week,
     date,
   };
-}
+});
 
 /** Текущие стрики сразу для многих учеников — для таблиц и списков. */
 export async function streaksOf(userIds: string[]): Promise<Record<string, number>> {

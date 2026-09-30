@@ -19,9 +19,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function Home() {
   const user = await requireUser();
-  const student = await studentOfUser(user.id);
+  // ученик и учитель — параллельно (оба нужны и меню)
+  const [student, teacher] = await Promise.all([studentOfUser(user.id), teacherOfUser(user.id)]);
   // Учитель без ID ученика сразу попадает в свой кабинет.
-  if (!student && (await teacherOfUser(user.id))) redirect('/teach');
+  if (!student && teacher) redirect('/teach');
   // Админ без ID ученика: главная ученика ему не нужна — сразу в админку.
   if (!student && isAdmin(user)) redirect('/admin');
   const now = nowInTz();
