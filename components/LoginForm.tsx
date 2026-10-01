@@ -30,7 +30,7 @@ export default function LoginForm({ google, tgBot, initialError }: { google: boo
 
   return (
     <div className="auth-card">
-      <h2>{mode === 'login' ? 'Вход в Bootcamp' : 'Регистрация'}</h2>
+      <h2>{mode === 'login' ? 'Вход в TR-YÖS Bootcamp' : 'Регистрация'}</h2>
       <p className="muted" style={{ margin: 0 }}>
         {mode === 'login' ? 'Войди, чтобы увидеть курсы, расписание и прогресс.' : 'Аккаунт бесплатный. ID ученика можно привязать потом.'}
       </p>

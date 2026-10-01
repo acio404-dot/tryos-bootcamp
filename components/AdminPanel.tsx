@@ -23,7 +23,7 @@ import TeacherTag, { TeacherName } from './TeacherTag';
 import MockResults from './MockResults';
 import { adminConnectWebhook, adminRunReminders } from '@/lib/notify-actions';
 import type { MockBatch } from '@/lib/mock';
-import { DOW, dateShort, plural } from '@/lib/format';
+import { DOW, dateShort, plural, todayIso } from '@/lib/format';
 
 /** '2027-04-11' → '11 апр 2027' (год — только если не текущий). */
 function short(iso: string | null | undefined): string {
@@ -591,7 +591,7 @@ function StudentForm({
 
 function ScoresBlock({ studentId, scores }: { studentId: string; scores: AScore[] }) {
   const act = useAction();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
   const [v, setV] = useState({ title: '', value: '', max: '100', teacher: '', date: today });
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => setV({ ...v, [k]: e.target.value });
 
@@ -931,7 +931,7 @@ function EventsTab({
   students: AStudent[]; groups: AGroup[]; members: AMember[]; events: AEvent[];
 }) {
   const act = useAction();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
   const [v, setV] = useState({ kind: 'lesson', title: '', date: '', time: '', link: '', note: '' });
   const [audience, setAudience] = useState<Audience>('all');
   const [pickedGroups, setPickedGroups] = useState<number[]>([]);
@@ -1050,7 +1050,7 @@ function EventsTab({
 function PlanRow({ plan, who }: { plan: Plan; who: string }) {
   const act = useAction();
   const e = plan.head;
-  const past = e.at.slice(0, 10) < new Date().toLocaleDateString('en-CA');
+  const past = e.at.slice(0, 10) < todayIso();
   return (
     <div className="a-row">
       <div className="a-row-head">
