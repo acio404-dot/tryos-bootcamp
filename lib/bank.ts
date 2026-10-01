@@ -33,6 +33,10 @@ import v4p3 from '@/content/bank-v4-practice-iq.json';
 import v4e1 from '@/content/bank-v4-exam-algebra.json';
 import v4e2 from '@/content/bank-v4-exam-geometry.json';
 import v4e3 from '@/content/bank-v4-exam-iq.json';
+// Банк v5 (октябрь 2026): каждая тема тренажёра — 200+ задач. Только форматы, которые уже были в теме
+// (генераторы v3/v4 и форматы старого банка v2), каждая задача проверена независимым решателем.
+import v5pa from '@/content/bank-v5-practice-algebra.json';
+import v5ea from '@/content/bank-v5-exam-algebra.json';
 // Снятые с выдачи задачи: темы, которых нет на экзамене, и слишком лёгкие шаблоны.
 import retired from '@/content/bank-retired.json';
 
@@ -95,6 +99,7 @@ const ALL_PRACTICE: Item[] = [
   ...asItems(pr1), ...asItems(pr2), ...asItems(pr3), ...asItems(pr4),
   ...asItems(v3p1), ...asItems(v3p2), ...asItems(v3p3),
   ...asItems(v4p1), ...asItems(v4p2), ...asItems(v4p3),
+  ...asItems(v5pa),
 ];
 
 const ALL_EXAM: Item[] = [
@@ -102,6 +107,7 @@ const ALL_EXAM: Item[] = [
   ...asItems(ex4), ...asItems(ex5), ...asItems(ex6),
   ...asItems(v3e1), ...asItems(v3e2), ...asItems(v3e3),
   ...asItems(v4e1), ...asItems(v4e2), ...asItems(v4e3),
+  ...asItems(v5ea),
 ];
 
 /* Снятые с выдачи задачи (content/bank-retired.json): сравнения по модулю,
