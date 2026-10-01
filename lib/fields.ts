@@ -3,6 +3,7 @@
  */
 
 import type { Slot } from './data';
+import { SCHOOL_TZ } from './format';
 
 export const clean = (s: unknown, n = 200) => String(s ?? '').trim().slice(0, n) || null;
 export const dateOrNull = (s: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) ? String(s) : null);
@@ -20,7 +21,7 @@ export const url = (s: unknown) => {
 };
 
 export const KINDS = ['deadline', 'lesson', 'exam'];
-export const TZONE = () => process.env.BOOTCAMP_TZ || 'Asia/Tashkent';
+export const TZONE = () => process.env.BOOTCAMP_TZ || SCHOOL_TZ;
 
 /** Общая проверка полей события. Возвращает либо текст ошибки, либо готовые значения. */
 export function eventFields(input: { kind?: string; title?: string; date?: string; time?: string; link?: unknown; note?: unknown }) {

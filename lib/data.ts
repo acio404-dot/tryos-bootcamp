@@ -5,6 +5,7 @@
 import { cache } from 'react';
 import { randomInt } from 'node:crypto';
 import { db, one } from './db';
+import { SCHOOL_TZ } from './format';
 import type { User } from './auth';
 
 export { SECTIONS, can } from './access';
@@ -109,8 +110,8 @@ export async function eventsOf(studentId: string, groupIds: number[], fromIso: s
     order by at`;
 }
 
-/** Часовой пояс школы: время в расписании задаётся в нём. */
-export const TZ = process.env.BOOTCAMP_TZ || 'Asia/Tashkent';
+/** Часовой пояс школы (турецкое время): время в расписании задаётся и показывается в нём. */
+export const TZ = process.env.BOOTCAMP_TZ || SCHOOL_TZ;
 
 /** Дата и время «сейчас» в часовом поясе школы. */
 export function nowInTz(d = new Date()) {
