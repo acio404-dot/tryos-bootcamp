@@ -11,8 +11,8 @@ const unbounded = Unbounded({ subsets: ['latin', 'latin-ext', 'cyrillic'], weigh
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://bootcamp.tryoszone.com'),
-  title: { default: 'Bootcamp · TR-YÖS Zone', template: '%s · Bootcamp TR-YÖS Zone' },
-  description: 'Личный кабинет учеников TR-YÖS Zone: курсы, расписание, прогресс и отсчёт до экзамена.',
+  title: { default: 'TR-YÖS Bootcamp — платформа подготовки к TR-YÖS', template: '%s · TR-YÖS Bootcamp' },
+  description: 'TR-YÖS Bootcamp — платформа подготовки к экзамену TR-YÖS от школы TR-YÖS Zone: тренажёр по всем темам, пробные экзамены, курсы, расписание и прогресс.',
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: '48x48' },
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
   },
-  // личный кабинет не нужен в поиске
+  // в поиске платформа не нужна: внутри данные учеников
   robots: { index: false, follow: false },
 };
 
