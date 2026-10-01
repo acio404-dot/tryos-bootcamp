@@ -1,6 +1,6 @@
 # TR-YÖS Zone · Bootcamp
 
-Личный кабинет учеников школы TR-YÖS Zone: bootcamp.tryoszone.com.
+TR-YÖS Bootcamp — платформа подготовки к экзамену TR-YÖS от школы TR-YÖS Zone: bootcamp.tryoszone.com.
 
 - вход: логин и пароль, Google, Telegram;
 - ID ученика открывает курсы, расписание, баллы и уровень доступа;
