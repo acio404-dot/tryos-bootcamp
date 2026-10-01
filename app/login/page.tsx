@@ -21,8 +21,9 @@ export default async function Login({ searchParams }: { searchParams: { error?: 
         </a>
         <div>
           <h1>Твоя подготовка к TR-YÖS — в одном месте</h1>
-          <p>Личный кабинет учеников TR-YÖS Zone.</p>
+          <p>TR-YÖS Bootcamp — платформа подготовки к экзамену от школы TR-YÖS Zone.</p>
           <ul className="auth-list">
+            <li>Тренажёр по всем темам экзамена и пробные экзамены</li>
             <li>Сколько дней осталось до твоего экзамена</li>
             <li>Курсы, группа и расписание занятий</li>
             <li>Прогресс по задачам и баллы за пробные тесты</li>
