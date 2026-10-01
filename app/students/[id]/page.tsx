@@ -60,7 +60,7 @@ export default async function StudentPage({ params }: { params: { id: string } }
             {' · '}<span className="code">{st.id}</span>
           </p>
           <p className="muted" style={{ fontSize: 13.5, marginTop: 4 }}>
-            {st.user_id ? (st.last_seen ? `Последний вход: ${dateRu(st.last_seen, false)}` : 'Вошёл в кабинет') : 'Ещё не вошёл в кабинет — решённых задач нет, но очные пробники видны'}
+            {st.user_id ? (st.last_seen ? `Последний вход: ${dateRu(st.last_seen, false)}` : 'Заходил на платформу') : 'Ещё не заходил на платформу — решённых задач нет, но очные пробники видны'}
             {st.exam_date ? ` · экзамен ${dateRu(st.exam_date)}` : ''}
             {st.target_score ? ` · цель ${st.target_score}` : ''}
           </p>
