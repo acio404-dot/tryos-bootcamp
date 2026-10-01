@@ -1,5 +1,13 @@
 /* Русские даты и склонения — общие для сервера и браузера. */
 
+/** Часовой пояс школы — Стамбул (турецкое время, UTC+3): по нему расписание, сроки, «сегодня» и задача дня. */
+export const SCHOOL_TZ = 'Europe/Istanbul';
+
+/** Сегодняшняя дата 'YYYY-MM-DD' по времени школы — одинаково на сервере и в браузере. */
+export function todayIso(d: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: SCHOOL_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+
 export function plural(n: number, one: string, few: string, many: string): string {
   const a = Math.abs(n) % 100;
   const b = a % 10;

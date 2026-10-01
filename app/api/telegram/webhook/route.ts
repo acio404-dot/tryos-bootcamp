@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const text: string = String(msg?.text || '').trim();
   if (!chat?.id || chat.type !== 'private') return NextResponse.json({ ok: true });
   const site = SITE();
-  const open = [{ text: 'Открыть кабинет', url: `${site}/` }];
+  const open = [{ text: 'Открыть TR-YÖS Bootcamp', url: `${site}/` }];
 
   if (text.startsWith('/start')) {
     const code = text.split(/\s+/)[1] || '';
@@ -29,8 +29,8 @@ export async function POST(req: NextRequest) {
       : null;
     if (!link) {
       await sendMessage(chat.id,
-        'Привет! Это бот TR-YÖS Zone Bootcamp — напоминания о занятиях, сроках и стрике.\n\n'
-        + 'Чтобы подключить напоминания, открой кабинет → <b>Настройки</b> → «Напоминания в Telegram» → «Подключить».',
+        'Привет! Это бот TR-YÖS Bootcamp — платформы подготовки к TR-YÖS. Напоминаю о занятиях, сроках и стрике.\n\n'
+        + 'Чтобы подключить напоминания, открой TR-YÖS Bootcamp → <b>Настройки</b> → «Напоминания в Telegram» → «Подключить».',
         [{ text: 'Открыть настройки', url: `${site}/settings#notify` }]);
       return NextResponse.json({ ok: true });
     }
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     await sendMessage(chat.id,
       `Готово, ${esc(u?.name?.split(' ')[0] || 'привет')}! Напоминания подключены ✅\n\n`
       + 'Буду писать за час до занятия (со ссылкой), за сутки до срока сдачи и вечером, если стрик под угрозой. '
-      + 'Что присылать — выбирается в настройках кабинета. Отключить всё — /stop.', open);
+      + 'Что присылать — выбирается в настройках на платформе. Отключить всё — /stop.', open);
     return NextResponse.json({ ok: true });
   }
 
@@ -48,11 +48,11 @@ export async function POST(req: NextRequest) {
     const n = await db`update bc_users set notify = notify || '{"lessons":false,"deadlines":false,"streak":false}'::jsonb
       where tg_chat_id = ${String(chat.id)} or tg_id = ${String(chat.id)} returning id`;
     await sendMessage(chat.id, n.length
-      ? 'Напоминания выключены. Включить снова — в настройках кабинета.'
-      : 'Этот чат не привязан к кабинету.', [{ text: 'Настройки', url: `${site}/settings#notify` }]);
+      ? 'Напоминания выключены. Включить снова — в настройках на платформе.'
+      : 'Этот чат не привязан к аккаунту на платформе.', [{ text: 'Настройки', url: `${site}/settings#notify` }]);
     return NextResponse.json({ ok: true });
   }
 
-  await sendMessage(chat.id, 'Я присылаю напоминания о занятиях, сроках и стрике. Настроить — в кабинете.', open);
+  await sendMessage(chat.id, 'Я присылаю напоминания о занятиях, сроках и стрике. Настроить — в TR-YÖS Bootcamp, раздел «Настройки».', open);
   return NextResponse.json({ ok: true });
 }

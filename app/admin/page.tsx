@@ -6,7 +6,7 @@ import { studentOfUser } from '@/lib/data';
 import { streaksOf } from '@/lib/streak';
 import { mockBatches } from '@/lib/mock';
 import { botName, botReady, webhookInfo } from '@/lib/telegram';
-import { nowInTz } from '@/lib/data';
+import { TZ, nowInTz } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Админка' };
@@ -27,7 +27,7 @@ export default async function Admin() {
     db`select id, student_id, title, value::float as value, max::float as max, teacher, to_char(date, 'YYYY-MM-DD') as date
        from bc_scores order by date desc, id desc`,
     db`select id, group_id, student_id, kind, title, scope, batch, link, note,
-         to_char(at at time zone ${process.env.BOOTCAMP_TZ || 'Asia/Tashkent'}, 'YYYY-MM-DD HH24:MI') as at
+         to_char(at at time zone ${TZ}, 'YYYY-MM-DD HH24:MI') as at
        from bc_events where at > now() - interval '30 days' order by at`,
     db`select count(*)::int as n from bc_users`,
     db`select t.id, t.name, t.phone, t.note, t.user_id, u.username, u.tg_username, u.email,
@@ -40,7 +40,7 @@ export default async function Admin() {
     mockBatches(),
     // проведённые тестирования из расписания — чтобы внести по ним баллы
     db<{ title: string; day: string; group_id: number | null }>`select title, group_id,
-        to_char(at at time zone ${process.env.BOOTCAMP_TZ || 'Asia/Tashkent'}, 'YYYY-MM-DD') as day
+        to_char(at at time zone ${TZ}, 'YYYY-MM-DD') as day
       from bc_events where kind = 'exam' and at > now() - interval '180 days' and at < now() + interval '1 day'
       order by at desc limit 80`,
   ]);

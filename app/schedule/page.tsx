@@ -13,6 +13,10 @@ export const metadata = { title: 'Расписание' };
 
 const COLORS = ['#1E8F8A', '#2C7FB0', '#7A5AC8', '#C9791C', '#1F9D6B'];
 const KIND: Record<string, string> = { deadline: 'Сдать', lesson: 'Доп. занятие', exam: 'Экзамен' };
+const TZ_LABEL: Record<string, string> = {
+  'Europe/Istanbul': 'по турецкому времени (Стамбул, UTC+3)',
+  'Asia/Tashkent': 'по ташкентскому времени (UTC+5)',
+};
 
 export default async function Schedule({ searchParams }: { searchParams: { w?: string } }) {
   const user = await requireUser();
@@ -141,7 +145,7 @@ export default async function Schedule({ searchParams }: { searchParams: { w?: s
               </div>
             ))}
           </div>
-          <p className="note">Время указано по часовому поясу школы ({TZ.replace('Asia/', '').replace('Europe/', '')}).</p>
+          <p className="note">Время указано {TZ_LABEL[TZ] || `по часовому поясу ${TZ.replace(/^\w+\//, '')}`}.</p>
 
           <div className="card mt upcoming">
             <div className="card-head"><h2>Ближайшие занятия</h2></div>

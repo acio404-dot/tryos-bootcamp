@@ -16,6 +16,7 @@ import {
   CATALOG, PRACTICE, practiceByTopic, practiceItem, toPublic,
   type Item, type PublicQuestion, type Section, type Topic, type Verdict,
 } from './bank';
+import { SCHOOL_TZ } from './format';
 
 /** Задача целиком — для сервера сайта. В браузер он отдаёт её без ответа и разбора. */
 export interface OpenQuestion {
@@ -53,9 +54,9 @@ const presentable = (q: Item) => q.section === 'algebra' || Boolean(q.figure);
 
 /* ----------------------------------------------------------- задача дня */
 
-/* Сутки считаются по времени Турции: экзамен турецкий, и задача меняется
+/* Сутки считаются по времени школы — турецкому (Стамбул): задача меняется
    в полночь по Стамбулу одинаково для всех. */
-const TZ = 'Europe/Istanbul';
+const TZ = SCHOOL_TZ;
 
 function fnv(s: string): number {
   let h = 0x811c9dc5;
