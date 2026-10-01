@@ -39,6 +39,9 @@ import v5pa from '@/content/bank-v5-practice-algebra.json';
 import v5ea from '@/content/bank-v5-exam-algebra.json';
 import v5pg from '@/content/bank-v5-practice-geometry.json';
 import v5eg from '@/content/bank-v5-exam-geometry.json';
+import v5pi1 from '@/content/bank-v5-practice-iq-1.json';
+import v5pi2 from '@/content/bank-v5-practice-iq-2.json';
+import v5ei from '@/content/bank-v5-exam-iq.json';
 // Снятые с выдачи задачи: темы, которых нет на экзамене, и слишком лёгкие шаблоны.
 import retired from '@/content/bank-retired.json';
 
@@ -101,7 +104,7 @@ const ALL_PRACTICE: Item[] = [
   ...asItems(pr1), ...asItems(pr2), ...asItems(pr3), ...asItems(pr4),
   ...asItems(v3p1), ...asItems(v3p2), ...asItems(v3p3),
   ...asItems(v4p1), ...asItems(v4p2), ...asItems(v4p3),
-  ...asItems(v5pa), ...asItems(v5pg),
+  ...asItems(v5pa), ...asItems(v5pg), ...asItems(v5pi1), ...asItems(v5pi2),
 ];
 
 const ALL_EXAM: Item[] = [
@@ -109,7 +112,7 @@ const ALL_EXAM: Item[] = [
   ...asItems(ex4), ...asItems(ex5), ...asItems(ex6),
   ...asItems(v3e1), ...asItems(v3e2), ...asItems(v3e3),
   ...asItems(v4e1), ...asItems(v4e2), ...asItems(v4e3),
-  ...asItems(v5ea), ...asItems(v5eg),
+  ...asItems(v5ea), ...asItems(v5eg), ...asItems(v5ei),
 ];
 
 /* Снятые с выдачи задачи (content/bank-retired.json): сравнения по модулю,
