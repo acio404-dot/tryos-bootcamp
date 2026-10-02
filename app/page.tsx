@@ -1,21 +1,26 @@
 import Link from 'next/link';
 import Shell from '@/components/Shell';
 import LinkIdForm from '@/components/LinkIdForm';
-import ModeCards from '@/components/ModeCards';
+import { NurSay, type NurMood } from '@/components/Nur';
+import { Ico, IArrow } from '@/components/icons';
 import { ExamCard, NextLessonCard, ScoreChart, SECTION_RU, SectionBars, tone } from '@/components/widgets';
 import { redirect } from 'next/navigation';
 import { isAdmin, requireUser } from '@/lib/auth';
 import {
   addDays, can, eventsOf, examOf, groupsOfStudent, nowInTz, progressOf, scoresOf, studentOfUser, teacherOfUser, upcomingLessons, withLessonInfo,
 } from '@/lib/data';
-import { mistakeCount, myBestSurvival } from '@/lib/runs';
+import { navStats } from '@/lib/nav';
 import { topicInfo } from '@/lib/bank';
 import { streakOf } from '@/lib/streak';
 import StreakCard from '@/components/StreakCard';
-import { DOW_FULL, dateRu, firstName, plural } from '@/lib/format';
+import { DOW_FULL, dateRu, daysBetween, firstName, plural, whenRu } from '@/lib/format';
 import { practiceAccess } from '@/lib/staff';
 
 export const dynamic = 'force-dynamic';
+
+const Flame = () => (
+  <svg viewBox="0 0 16 18" fill="none" aria-hidden="true"><path d="M8 1c1 3 5 5 5 9.5A5 5 0 0 1 3 10.5C3 8.5 4 7.5 5 6c.5 2 1.5 2.5 2 2.5C7 6 6.5 3.5 8 1z" fill="currentColor" /></svg>
+);
 
 export default async function Home() {
   const user = await requireUser();
@@ -28,13 +33,13 @@ export default async function Home() {
   const now = nowInTz();
   const access = student?.access;
 
-  const [groups, progress, scores, mistakes, bestStreak, streak] = await Promise.all([
+  const [groups, progress, scores, stats, streak, practice] = await Promise.all([
     student && can(access, 'schedule') ? groupsOfStudent(student.id) : Promise.resolve([]),
     progressOf(user.id, student?.id),
     student && can(access, 'scores') ? scoresOf(student.id) : Promise.resolve([]),
-    mistakeCount(user.id),
-    myBestSurvival(user.id),
+    navStats(user.id, student?.id),
     streakOf(user.id),
+    practiceAccess(user, student),
   ]);
   const lessons = await withLessonInfo(upcomingLessons(groups, 14, 1));
   const events = student && can(access, 'schedule')
@@ -51,22 +56,82 @@ export default async function Home() {
     .sort((a, b) => a.pct - b.pct)
     .slice(0, 4);
 
+  const who = firstName(user.name);
+  const name = who || 'ученик';
+  /** Обращение в реплике Nur: «John, до экзамена…»; без имени фраза начинается с заглавной. */
+  const hey = (rest: string) => (who ? `${who}, ${rest}` : `${rest[0].toUpperCase()}${rest.slice(1)}`);
+  const daysLeft = exam?.date ? daysBetween(now.date, exam.date) : null;
+  const trainerOpen = can(practice, 'trainer');
+  const solved = progress.topics.reduce((n, t) => n + t.total, 0);
+  const lesson = lessons[0] || null;
+  const lessonLink = lesson ? (lesson.link !== undefined ? lesson.link : lesson.group.link) : null;
+
+  /* Одно главное дело на сегодня: долги из ошибок → слабая тема → диагностика → выживание. */
+  const worst = weak.find((t) => t.pct < 70);
+  const plan = trainerOpen && stats.mistakes > 0
+    ? {
+      title: `Работа над ошибками: ${stats.mistakes} ${plural(stats.mistakes, 'задача', 'задачи', 'задач')}`,
+      text: 'Здесь задачи, где последний ответ был неверным. Решишь верно — задача уходит из списка сама.',
+      href: '/mistakes', cta: 'Разобрать ошибки',
+      say: <>Сначала долги: <b>{stats.mistakes} {plural(stats.mistakes, 'задача', 'задачи', 'задач')}</b> из ошибок {plural(stats.mistakes, 'ждёт', 'ждут', 'ждут')} второго захода.</>,
+    }
+    : trainerOpen && worst
+      ? {
+        title: `Подтянуть: ${worst.label}`,
+        text: `Точность ${worst.pct} % на ${worst.total} ${plural(worst.total, 'задаче', 'задачах', 'задачах')}. Двадцать задач темы, разбор сразу после ответа.`,
+        href: `/trainer/${encodeURIComponent(worst.topic)}`, cta: 'Тренировать',
+        say: <>Слабое место сегодня — <b>{worst.label.toLowerCase()}</b>. Посветить?</>,
+      }
+      : !progress.tests.length
+        ? {
+          title: 'Быстрая диагностика: 20 задач',
+          text: 'Двадцать задач за 25 минут в формате экзамена. Покажет текущий балл и темы, которые тянут его вниз.',
+          href: '/exam', cta: 'К пробникам',
+          say: <>Начнём с диагностики: <b>20 задач</b>, и станет видно, куда светить.</>,
+        }
+        : {
+          title: 'Проверь темп: выживание',
+          text: 'Задачи одна за другой, 90 секунд на каждую и три лампочки. Экзамен даёт на задачу 75 секунд.',
+          href: '/survival', cta: 'Зажечь свет',
+          say: trainerOpen ? <>Долгов нет. Проверим <b>темп</b>: 90 секунд на задачу?</> : <>Проверим <b>темп</b>: 90 секунд на задачу?</>,
+        };
+
+  /* Настроение и первая фраза Nur. С 02:00 до 06:00 он выключен и молчит. */
+  const hour = Math.floor(now.minutes / 60);
+  const asleep = hour >= 2 && hour < 6;
+  let mood: NurMood = 'default';
+  let lead: React.ReactNode = <>{hey('свет есть. ')}</>;
+  if (hour === 1) { mood = 'yawn'; lead = <>{hey('час ночи, я зеваю. Одно дело, и спать. ')}</>; }
+  else if (daysLeft === 0) { mood = 'support'; lead = <>{hey('экзамен ')}<b>сегодня</b>. Дыши ровно, всё получится. Kolay gelsin!</>; }
+  else if (daysLeft === 1) { mood = 'nervous'; lead = <>{hey('экзамен ')}<b>завтра</b>. Сегодня без подвигов. </>; }
+  else if (!streak.current && streak.best > 0) { mood = 'sad'; lead = <>{hey('без тебя было темно. Хорошо, что ты здесь. ')}</>; }
+  else if (streak.current > 0 && !streak.today) { mood = hour >= 22 ? 'late' : 'waiting'; lead = <>{hey('стрик ')}<b>{streak.current} {plural(streak.current, 'день', 'дня', 'дней')}</b> ждёт сегодняшней задачи. </>; }
+  else if (daysLeft !== null && daysLeft > 1) { lead = <>{hey('до экзамена ')}<b>{daysLeft} {plural(daysLeft, 'день', 'дня', 'дней')}</b>. </>; }
+  else if (!solved) { lead = <>{hey('я Nur. Я свечу, ты решаешь. ')}</>; }
+
+  const streakLabel = streak.current
+    ? `${streak.current} ${plural(streak.current, 'день', 'дня', 'дней')}${streak.today ? '' : ' · реши сегодня'}`
+    : 'стрика пока нет';
+
   return (
     <Shell user={user} student={student} active="home" streak={streak}>
-      {/* на телефоне блоки выстраиваются по порядку из CSS: сначала ближайшее занятие, потом стрик и режимы */}
-      <div className="home">
-      <div className="top">
+      <header className="hello">
         <div>
-          <h1>Привет, {firstName(user.name) || 'ученик'}!</h1>
-          <p>Сегодня {DOW_FULL[now.dow - 1]}, {dateRu(now.date, false)}.</p>
+          <span className="date-line">{DOW_FULL[now.dow - 1]}, {dateRu(now.date, false)}{exam?.date ? <span className="m-hide"> · {exam.name}{exam.city ? `, ${exam.city}` : ''} {dateRu(exam.date, false)}</span> : null}</span>
+          <h1>Привет, {name}</h1>
         </div>
-        <div className="top-actions m-hide">
-          <Link className="btn btn-ghost" href="/trainer">Тренажёр</Link>
-          <Link className="btn btn-primary" href="/exam">Пробник</Link>
-        </div>
-      </div>
+        <span className={`streak-pill${streak.current ? '' : ' off'}`} title="Стрик: дни подряд с решёнными задачами"><Flame />{streakLabel}</span>
+      </header>
 
-      <div className="h-streak"><StreakCard s={streak} /></div>
+      {asleep ? (
+        <div className="nur-row">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/nur/off.svg" alt="" width={84} height={92} />
+          <p className="muted" style={{ margin: '0 0 10px', fontWeight: 600 }}>Nur выключается в 02:00 и спит до утра. Задачи открыты, но лучше тоже поспать.</p>
+        </div>
+      ) : (
+        <NurSay mood={mood}>{lead}{daysLeft === 0 ? null : plan.say}</NurSay>
+      )}
 
       {!student ? (
         <div className="banner">
@@ -78,24 +143,73 @@ export default async function Home() {
         </div>
       ) : null}
 
-      <div className="h-modes"><ModeCards mistakes={mistakes} best={bestStreak} lockedMistakes={!can(await practiceAccess(user, student), 'trainer')} /></div>
+      <div className="grid g-2 home-main">
+        <section className="plan" aria-label="Главное на сегодня">
+          <span className="kicker">Главное на сегодня</span>
+          <h2>{plan.title}</h2>
+          <p>{plan.text}</p>
+          {trainerOpen && weak.some((t) => t.pct < 70) ? (
+            <div className="plan-chips">
+              {weak.filter((t) => t.pct < 70).slice(0, 3).map((t) => (
+                <Link key={t.topic} className={`chip${t.pct < 55 ? ' chip-coral' : ''}`} href={`/trainer/${encodeURIComponent(t.topic)}`}>{t.label} · {t.pct} %</Link>
+              ))}
+            </div>
+          ) : null}
+          <div className="plan-act">
+            <Link className="btn btn-dark btn-lg" href={plan.href}>{plan.cta} <IArrow /></Link>
+            <span>{streak.today ? `Стрик на сегодня засчитан: ${streak.current} ${plural(streak.current, 'день', 'дня', 'дней')}` : streak.current ? `Решишь задачу — стрик станет ${streak.current + 1} ${plural(streak.current + 1, 'день', 'дня', 'дней')}` : 'Реши любую задачу — начнётся стрик'}</span>
+          </div>
+        </section>
 
-      <div className="grid g-2 mt home-duo">
-        <div className="h-exam"><ExamCard exam={exam} today={now.date} lastScore={lastScore} /></div>
-        <div className="h-lesson"><NextLessonCard lesson={lessons[0] || null} today={now.date} /></div>
+        <div className="m-hide"><NextLessonCard lesson={lesson} today={now.date} /></div>
+        {lesson ? (
+          <a className="rowlink only-m" href={lessonLink || '/schedule'} {...(lessonLink ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+            <Ico name="lesson" />
+            <span className="txt"><b>Занятие: {whenRu(now.date, lesson.date).toLowerCase()}, {lesson.start}</b><i>{lesson.group.course}{lesson.group.name ? ` · ${lesson.group.name}` : ''}{lesson.topic ? ` · ${lesson.topic}` : ''}</i></span>
+            <span className="act">{lessonLink ? 'Войти →' : 'Расписание →'}</span>
+          </a>
+        ) : null}
+
+        <div className="stats only-m">
+          <Link className="stat" href={daysLeft !== null && daysLeft >= 0 ? '/progress' : '/settings'}>
+            <b>{daysLeft === null || daysLeft < 0 ? '—' : daysLeft === 0 ? 'сегодня' : daysLeft}</b>
+            <span>{daysLeft === null ? 'укажи дату экзамена' : daysLeft < 0 ? 'экзамен прошёл' : daysLeft === 0 ? 'экзамен, удачи!' : `${plural(daysLeft, 'день', 'дня', 'дней')} до экзамена`}</span>
+          </Link>
+          <Link className="stat" href="/progress">
+            <b className="warm">{lastScore ?? '—'}</b>
+            <span>{lastScore === null ? 'балл пробника' : exam?.target ? `балл · цель ${exam.target}` : 'последний балл'}</span>
+          </Link>
+          <Link className="stat" href="/progress">
+            <b>{progress.week}</b>
+            <span>{plural(progress.week, 'задача', 'задачи', 'задач')} за неделю</span>
+          </Link>
+        </div>
       </div>
 
-      <div className="grid g-3 mt">
+      <div className="grid g-3 mt home-trio">
+        <div className="m-hide"><ExamCard exam={exam} today={now.date} lastScore={lastScore} /></div>
+        <StreakCard s={streak} />
+        <Link className="night-card m-hide" href="/survival">
+          <span className="kicker">Режим</span>
+          <h2>Выживание</h2>
+          <p>Свет отключили. {stats.best ? `Твой рекорд — ${stats.best} подряд.` : 'Три лампочки, 90 секунд на задачу.'}</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="art" src="/shadows/s-trapezoid.svg" alt="" width={150} height={138} />
+          <span className="btn btn-primary">Зажечь свет <IArrow /></span>
+        </Link>
+      </div>
+
+      <div className="grid g-3 mt m-hide">
         <div className="tile">
           <span>Последний тест</span>
           <b>{lastScore ?? '—'}</b>
           <i>
             {lastScore === null ? 'балл из 500' : prevMonth ? (
-              <><span className="up">{lastScore - prevMonth.score >= 0 ? '+' : ''}{lastScore - prevMonth.score}</span> за месяц</>
+              <><span className={lastScore - prevMonth.score >= 0 ? 'up' : 'down'}>{lastScore - prevMonth.score >= 0 ? '+' : '−'}{Math.abs(lastScore - prevMonth.score)}</span> за месяц</>
             ) : 'балл из 500'}
           </i>
         </div>
-        <div className="tile"><span>Решено за неделю</span><b>{progress.week}</b><i>{plural(progress.week, 'задача', 'задачи', 'задач')} в тренажёре</i></div>
+        <div className="tile"><span>Решено за неделю</span><b>{progress.week}</b><i>{plural(progress.week, 'задача', 'задачи', 'задач')} во всех режимах</i></div>
         <div className="tile"><span>Точность</span><b>{progress.monthAcc === null ? '—' : `${progress.monthAcc} %`}</b><i>за последние 30 дней</i></div>
       </div>
 
@@ -162,7 +276,6 @@ export default async function Home() {
             <p className="muted" style={{ margin: 0 }}>{student ? 'Пока нет оценок и сроков — они появятся, когда их добавит преподаватель.' : 'Оценки преподавателей видны после привязки ID ученика.'}</p>
           )}
         </div>
-      </div>
       </div>
     </Shell>
   );
