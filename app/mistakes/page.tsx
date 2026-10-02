@@ -18,7 +18,7 @@ export default async function Mistakes() {
   const student = await studentOfUser(user.id);
   if (!can(await practiceAccess(user, student), 'trainer')) {
     return (
-      <Shell user={user} student={student} active="trainer">
+      <Shell user={user} student={student} active="mistakes">
         <div className="top"><div><span className="eyebrow">Тренажёр</span><h1>Работа над ошибками</h1></div></div>
         <Locked hasId={Boolean(student)} title="Работа над ошибками закрыта"
           text="Здесь собираются задачи, в которых ты ошибся в тренажёре, пробниках и выживании, — чтобы дорешать их и закрыть пробелы." />
@@ -36,7 +36,7 @@ export default async function Mistakes() {
   const top = [...byTopic.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
 
   return (
-    <Shell user={user} student={student} active="trainer">
+    <Shell user={user} student={student} active="mistakes">
       <div className="top">
         <div>
           <span className="eyebrow">Тренажёр</span>
