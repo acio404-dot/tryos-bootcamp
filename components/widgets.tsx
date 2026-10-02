@@ -113,8 +113,8 @@ function chartSvg(tests: TestRow[], target: number | null, W: number) {
     <svg className="chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Баллы за тесты: последний ${last.score}`}>
       <defs>
         <linearGradient id={`fg${W}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3CC8C0" stopOpacity=".22" />
-          <stop offset="100%" stopColor="#3CC8C0" stopOpacity="0" />
+          <stop offset="0%" stopColor="#6fe3d3" stopOpacity=".22" />
+          <stop offset="100%" stopColor="#6fe3d3" stopOpacity="0" />
         </linearGradient>
       </defs>
       {grid}

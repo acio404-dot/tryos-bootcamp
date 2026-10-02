@@ -3,6 +3,7 @@
  * Всё пишется от имени вошедшего пользователя — id берётся не из запроса.
  */
 
+import { cache } from 'react';
 import { randomBytes } from 'node:crypto';
 import { db, one } from './db';
 import { checkAnswer, isActiveId, type Section } from './bank';
@@ -69,7 +70,8 @@ export async function mistakesOf(userId: string, limit = 40): Promise<MistakeRow
   return rows.filter((r) => isActiveId(r.question_id)).slice(0, limit);
 }
 
-export async function mistakeCount(userId: string): Promise<number> {
+/** cache — число нужно и странице, и меню: один запрос на страницу. */
+export const mistakeCount = cache(async (userId: string): Promise<number> => {
   const rows = await db<{ question_id: string }>`
     with last as (
       select distinct on (question_id) question_id, correct
@@ -79,7 +81,7 @@ export async function mistakeCount(userId: string): Promise<number> {
     )
     select question_id from last where correct = false`;
   return rows.filter((r) => isActiveId(r.question_id)).length;
-}
+});
 
 /* -------------------------------------------------------------- пробник */
 

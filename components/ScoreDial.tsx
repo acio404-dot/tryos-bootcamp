@@ -23,18 +23,18 @@ export default function ScoreDial({
       aria-label={`Балл ${score} из 500`}>
       <defs>
         <linearGradient id="dialGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#5FE3D6" />
-          <stop offset="55%" stopColor="#3CC8C0" />
-          <stop offset="100%" stopColor="#4FB6E8" />
+          <stop offset="0%" stopColor="#6fe3d3" />
+          <stop offset="55%" stopColor="#3fcab9" />
+          <stop offset="100%" stopColor="#8fd7ff" />
         </linearGradient>
       </defs>
       <g transform="rotate(135 90 90)">
-        <circle cx="90" cy="90" r={r} fill="none" stroke="#E9EFF6" strokeWidth="14"
+        <circle cx="90" cy="90" r={r} fill="none" stroke="#e8e1d0" strokeWidth="14"
           strokeLinecap="round" strokeDasharray={track} />
         <circle cx="90" cy="90" r={r} fill="none" stroke="url(#dialGrad)" strokeWidth="14"
           strokeLinecap="round" strokeDasharray={dash} />
         {tpos !== null ? (
-          <circle cx="90" cy="90" r={r} fill="none" stroke="#0B1626" strokeWidth="14"
+          <circle cx="90" cy="90" r={r} fill="none" stroke="#1a2440" strokeWidth="14"
             strokeDasharray={`2 ${c}`} strokeDashoffset={-c * span * tpos} opacity="0.55" />
         ) : null}
       </g>
