@@ -4,26 +4,28 @@ import ModeCards from '@/components/ModeCards';
 import { requireUser } from '@/lib/auth';
 import { can, studentOfUser } from '@/lib/data';
 import { hhmm } from '@/lib/bank-types';
-import { mistakeCount, myBestSurvival, openExamRun } from '@/lib/runs';
+import { navStats } from '@/lib/nav';
+import { openExamRun } from '@/lib/runs';
 import { dateRu } from '@/lib/format';
 import { practiceAccess } from '@/lib/staff';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Решать' };
+export const metadata = { title: 'Режимы' };
 
-/* «Решать» — все режимы в одном месте: вкладка нижней панели на телефоне. */
+/* «Режимы» — все способы решать задачи в одном месте: вкладка нижней панели на телефоне. */
 export default async function Practice() {
   const user = await requireUser();
-  const [student, mistakes, best, open] = await Promise.all([
-    studentOfUser(user.id), mistakeCount(user.id), myBestSurvival(user.id), openExamRun(user.id),
+  const student = await studentOfUser(user.id);
+  const [stats, open, access] = await Promise.all([
+    navStats(user.id, student?.id), openExamRun(user.id), practiceAccess(user, student),
   ]);
 
   return (
     <Shell user={user} student={student} active="practice">
       <div className="top">
         <div>
-          <h1>Решать</h1>
-          <p>Выбери режим: пробник с таймером, тренажёр по темам, работу над ошибками или выживание.</p>
+          <h1>Режимы</h1>
+          <p className="m-hide">Выживание на время, пробник с таймером, тренажёр по темам и работа над ошибками.</p>
         </div>
       </div>
 
@@ -33,11 +35,11 @@ export default async function Practice() {
             <b>Незаконченный пробник: {open.title}</b>
             <i>начат {dateRu(open.started_at, true)} · {hhmm(open.minutes)} на всё</i>
           </div>
-          <Link className="btn btn-primary" href={`/exam/${open.id}`}>Продолжить</Link>
+          <Link className="btn btn-dark" href={`/exam/${open.id}`}>Продолжить</Link>
         </div>
       ) : null}
 
-      <div className="practice-modes"><ModeCards mistakes={mistakes} best={best} lockedMistakes={!can(await practiceAccess(user, student), 'trainer')} /></div>
+      <ModeCards mistakes={stats.mistakes} best={stats.best} score={stats.score} lockedMistakes={!can(access, 'trainer')} />
     </Shell>
   );
 }
