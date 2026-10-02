@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import Brand from '@/components/Brand';
 import LoginForm from '@/components/LoginForm';
+import { Nur } from '@/components/Nur';
 import { currentUser } from '@/lib/auth';
 import { hasDb } from '@/lib/db';
 
@@ -15,25 +17,25 @@ export default async function Login({ searchParams }: { searchParams: { error?: 
   return (
     <div className="auth">
       <aside className="auth-side">
-        <a className="brand" href="https://www.tryoszone.com">
-          <span className="brand-mark"><img src="/logo.png" alt="TR-YÖS Zone" width={32} height={28} /></span>
-          <span><b>TR-YÖS</b><span>Bootcamp</span></span>
-        </a>
+        <Brand dark href="https://www.tryoszone.com" />
         <div>
-          <h1>Твоя подготовка к TR-YÖS — в одном месте</h1>
+          <div className="auth-nur">
+            <Nur mood="default" width={112} />
+            <p className="say" style={{ margin: 0 }}>Я свечу, ты решаешь. Hadi!</p>
+          </div>
+          <h1>Подготовка к <span className="nw">TR-YÖS</span> <em>каждый день</em></h1>
           <p>TR-YÖS Bootcamp — платформа подготовки к экзамену от школы TR-YÖS Zone.</p>
           <ul className="auth-list">
-            <li>Тренажёр по всем темам экзамена и пробные экзамены</li>
-            <li>Сколько дней осталось до твоего экзамена</li>
-            <li>Курсы, группа и расписание занятий</li>
-            <li>Прогресс по задачам и баллы за пробные тесты</li>
-            <li>Оценки преподавателей</li>
+            <li>Тренажёр по всем темам экзамена с разбором каждой задачи</li>
+            <li>Пробные экзамены с таймером и баллом 0–500</li>
+            <li>Режим выживания: задачи на время и три лампочки</li>
+            <li>Курсы, группа, расписание и оценки преподавателей</li>
           </ul>
         </div>
-        <p style={{ fontSize: 13 }}>
-          © TR-YÖS Zone · <a href="https://www.tryoszone.com" style={{ color: 'var(--teal-2)' }}>tryoszone.com</a>
-          {' · '}<Link href="/privacy" style={{ color: 'var(--teal-2)' }}>Конфиденциальность</Link>
-          {' · '}<Link href="/terms" style={{ color: 'var(--teal-2)' }}>Условия</Link>
+        <p className="auth-foot">
+          © TR-YÖS Zone · <a href="https://www.tryoszone.com">tryoszone.com</a>
+          {' · '}<Link href="/privacy">Конфиденциальность</Link>
+          {' · '}<Link href="/terms">Условия</Link>
         </p>
       </aside>
       <main className="auth-main">
