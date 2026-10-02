@@ -1,56 +1,54 @@
 import Link from 'next/link';
 import { TOTAL_TOPICS } from '@/lib/bank';
-import { IArrow, ICheck, IFlame, ILock, IRedo, ITarget } from './icons';
+import { plural } from '@/lib/format';
+import { Ico, ILock, type IcoName } from './icons';
 
-const topicsWord = (n: number) => {
-  const d = n % 10;
-  const dd = n % 100;
-  if (d === 1 && dd !== 11) return 'тема';
-  if (d >= 2 && d <= 4 && (dd < 12 || dd > 14)) return 'темы';
-  return 'тем';
-};
-
-const MODES = [
+const MODES: { href: string; key: string; ico: IcoName; title: string; text: string; meta: string }[] = [
   {
-    href: '/exam', key: 'exam', Icon: ITarget, title: 'Пробники',
+    href: '/survival', key: 'survival', ico: 'survival', title: 'Выживание',
+    text: 'Свет отключили. Задачи без конца, 90 секунд на каждую и три лампочки.',
+    meta: 'три лампочки',
+  },
+  {
+    href: '/exam', key: 'exam', ico: 'exam', title: 'Пробники',
     text: 'Полный формат 80 задач за 100 минут, половина, быстрая диагностика и отдельные разделы.',
     meta: 'балл 0–500',
   },
   {
-    href: '/trainer', key: 'trainer', Icon: ICheck, title: 'Тренажёр по темам',
-    text: 'Все темы экзамена: задача — ответ — разбор сразу.',
-    meta: `${TOTAL_TOPICS} ${topicsWord(TOTAL_TOPICS)}`,
+    href: '/trainer', key: 'trainer', ico: 'trainer', title: 'Тренажёр',
+    text: 'Все темы экзамена: задача — ответ — разбор сразу. Без таймера.',
+    meta: `${TOTAL_TOPICS} ${plural(TOTAL_TOPICS, 'тема', 'темы', 'тем')}`,
   },
   {
-    href: '/mistakes', key: 'mistakes', Icon: IRedo, title: 'Работа над ошибками',
+    href: '/mistakes', key: 'mistakes', ico: 'mistakes', title: 'Ошибки',
     text: 'Задачи, где последний ответ был неверным. Решишь правильно — уходит из списка.',
-    meta: 'по твоим промахам',
-  },
-  {
-    href: '/survival', key: 'survival', Icon: IFlame, title: 'Режим выживания',
-    text: 'Задачи без конца, 90 секунд на каждую, три жизни. Лучшая серия — в таблицу лидеров школы.',
-    meta: 'рекорд школы',
+    meta: 'пока пусто',
   },
 ];
 
-/** Четыре режима тренажёра — главный вход в кабинет. */
-export default function ModeCards({ mistakes = 0, best = 0, lockedMistakes = false }: { mistakes?: number; best?: number; lockedMistakes?: boolean }) {
+/** Четыре режима решения задач — вкладка «Режимы». */
+export default function ModeCards({
+  mistakes = 0, best = 0, score = null, lockedMistakes = false,
+}: { mistakes?: number; best?: number; score?: number | null; lockedMistakes?: boolean }) {
+  const note = (key: string, meta: string) => {
+    if (key === 'survival' && best) return `рекорд ${best}`;
+    if (key === 'exam' && score !== null) return `последний балл ${score}`;
+    if (key === 'mistakes' && lockedMistakes) return <><ILock /> открывает школа</>;
+    if (key === 'mistakes' && mistakes) return `${mistakes} ${plural(mistakes, 'задача ждёт', 'задачи ждут', 'задач ждут')}`;
+    return meta;
+  };
   return (
     <div className="modes">
-      {MODES.map(({ href, key, Icon, title, text, meta }) => (
+      {MODES.map(({ href, key, ico, title, text, meta }) => (
         <Link className={`mode mode-${key}`} href={href} key={key}>
-          <span className="mode-ico"><Icon /></span>
+          <Ico name={ico} />
+          {key === 'survival' ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="mode-art" src="/shadows/s-trapezoid.svg" alt="" width={132} height={121} />
+          ) : null}
           <b>{title}</b>
           <i>{text}</i>
-          <span className="mode-foot">
-            <em>
-              {key === 'mistakes' && lockedMistakes ? <><ILock /> открывает школа</> : null}
-              {key === 'mistakes' && !lockedMistakes && mistakes ? `${mistakes} в работе` : null}
-              {key === 'survival' && best ? `твой рекорд ${best}` : null}
-              {(key !== 'mistakes' && key !== 'survival') || (key === 'mistakes' && !mistakes && !lockedMistakes) || (key === 'survival' && !best) ? meta : null}
-            </em>
-            <IArrow />
-          </span>
+          <span className="mode-foot"><em>{note(key, meta)}</em></span>
         </Link>
       ))}
     </div>

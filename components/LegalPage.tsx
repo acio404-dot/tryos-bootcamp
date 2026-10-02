@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Brand from './Brand';
 
 export const CONTACT_TG = 'https://t.me/tryos_zone';
 export const UPDATED = { ru: '27 сентября 2026', en: 'September 27, 2026' };
@@ -27,10 +28,7 @@ export default function LegalPage({
   return (
     <div className="legal" lang={lang}>
       <header className="legal-head">
-        <Link className="brand" href="/login">
-          <span className="brand-mark"><img src="/logo.png" alt="TR-YÖS Zone" width={32} height={28} /></span>
-          <span><b>TR-YÖS</b><span>Bootcamp</span></span>
-        </Link>
+        <Brand dark href="/login" />
         <nav className="seg" aria-label={lang === 'en' ? 'Language' : 'Язык'}>
           <Link href={`/${doc}`} className={lang === 'ru' ? 'on' : ''} hrefLang="ru">Русский</Link>
           <Link href={`/${doc}?lang=en`} className={lang === 'en' ? 'on' : ''} hrefLang="en">English</Link>

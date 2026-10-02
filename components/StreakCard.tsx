@@ -6,8 +6,7 @@ const dowOf = (iso: string) => (new Date(`${iso}T12:00:00Z`).getUTCDay() + 6) % 
 
 /*
  * Стрик на главной: сколько дней подряд ученик заходит и решает задачи,
- * отметки за последние 7 дней и рекорд. Полоса во всю ширину — первое, что
- * видно после приветствия.
+ * отметки за последние 7 дней и рекорд.
  */
 export default function StreakCard({ s }: { s: StreakInfo }) {
   const days = `${s.current} ${plural(s.current, 'день', 'дня', 'дней')}`;
@@ -22,9 +21,8 @@ export default function StreakCard({ s }: { s: StreakInfo }) {
         {s.current ? <StreakBadge n={s.current} size="md" /> : <span className="streak-off" aria-hidden="true" />}
       </div>
       <div className="streak-txt">
-        <span className="streak-kicker">Стрик</span>
+        <span className="streak-kicker">Стрик{s.best > s.current ? ` · рекорд ${s.best}` : ''}</span>
         <b>{s.current ? `${days} подряд` : 'Пока нет стрика'}</b>
-        <i>{status}</i>
       </div>
       <div className="streak-week" aria-label="Последние 7 дней">
         {s.week.map((d) => (
@@ -35,10 +33,7 @@ export default function StreakCard({ s }: { s: StreakInfo }) {
           </span>
         ))}
       </div>
-      <div className="streak-best">
-        <b>{s.best}</b>
-        <span>{plural(s.best, 'день', 'дня', 'дней')} — рекорд</span>
-      </div>
+      <p className="streak-note">{status}</p>
     </section>
   );
 }
