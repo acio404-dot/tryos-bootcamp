@@ -54,3 +54,26 @@ export const initials = (name: string) =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase() || '').join('') || 'У';
 
 export const firstName = (name: string) => name.trim().split(/\s+/)[0] || '';
+
+const DOW_GEN = ['понедельника', 'вторника', 'среды', 'четверга', 'пятницы', 'субботы', 'воскресенья'];
+
+/** Срок сдачи: «сегодня до 16:30», «завтра до конца дня», «до субботы, 16:30», «до 21 октября». */
+export function dueRu(todayIso: string, dayIso: string, time: string): string {
+  const diff = daysBetween(todayIso, dayIso);
+  const endOfDay = time === '23:59';
+  if (diff === 0) return endOfDay ? 'сегодня до конца дня' : `сегодня до ${time}`;
+  if (diff === 1) return endOfDay ? 'завтра до конца дня' : `завтра до ${time}`;
+  const dow = (new Date(`${dayIso}T00:00:00Z`).getUTCDay() + 6) % 7;
+  // в пределах недели — день недели, дальше — дата
+  const day = diff > 1 && diff < 7 ? `до ${DOW_GEN[dow]}` : `до ${dateRu(dayIso, false)}`;
+  return endOfDay ? day : `${day}, ${time}`;
+}
+
+/** Срок коротко, для меню: «сегодня», «завтра», «до сб», «до 21.10». */
+export function dueShort(todayIso: string, dayIso: string): string {
+  const diff = daysBetween(todayIso, dayIso);
+  if (diff === 0) return 'сегодня';
+  if (diff === 1) return 'завтра';
+  const dow = (new Date(`${dayIso}T00:00:00Z`).getUTCDay() + 6) % 7;
+  return diff > 1 && diff < 7 ? `до ${DOW[dow].toLowerCase()}` : `до ${dayIso.slice(8, 10)}.${dayIso.slice(5, 7)}`;
+}

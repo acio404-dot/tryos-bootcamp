@@ -4,16 +4,25 @@
  */
 
 import { cache } from 'react';
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { db, one } from './db';
 import { checkAnswer, isActiveId, type Section } from './bank';
 import { addDays, nowInTz, TZ } from './data';
 
 export const newId = () => randomBytes(9).toString('base64url');
 
+/**
+ * Подставной id задачи внутри серии или набора (см. toPublic в lib/bank.ts).
+ * Один и тот же для пары «набор + задача», по нему нельзя восстановить настоящий id.
+ */
+export function aliasId(scope: string, questionId: string): string {
+  const key = process.env.AUTH_SECRET || 'tryos-bootcamp';
+  return `q${createHmac('sha256', key).update(`${scope}:${questionId}`).digest('hex').slice(0, 20)}`;
+}
+
 /* ------------------------------------------------------------- попытки */
 
-export type Mode = 'practice' | 'exam' | 'survival' | 'mistakes';
+export type Mode = 'practice' | 'exam' | 'survival' | 'mistakes' | 'shift' | 'homework';
 
 /** Одна решённая задача. Отсюда растут «Прогресс» и «Работа над ошибками». */
 export async function recordAttempt(
@@ -23,9 +32,13 @@ export async function recordAttempt(
   mode: Mode,
   /** Сколько секунд ушло на задачу — там, где идёт таймер. */
   seconds: number | null = null,
+  /** Сколько попыток ушло на задачу: 2 — была подсказка и вторая попытка (смена, домашка). */
+  tries = 1,
+  /** Задача решена со второй попытки. correct при этом false: в статистике считается первый ответ. */
+  fixed = false,
 ): Promise<void> {
-  await db`insert into bc_attempts (user_id, question_id, topic, topic_label, section, correct, mode, seconds)
-    values (${userId}, ${q.id}, ${q.topic}, ${q.topicLabel}, ${q.section}, ${correct}, ${mode}, ${seconds})`;
+  await db`insert into bc_attempts (user_id, question_id, topic, topic_label, section, correct, mode, seconds, try, fixed)
+    values (${userId}, ${q.id}, ${q.topic}, ${q.topicLabel}, ${q.section}, ${correct}, ${mode}, ${seconds}, ${tries}, ${fixed})`;
 }
 
 export async function recordAttempts(
