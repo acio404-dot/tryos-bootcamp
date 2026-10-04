@@ -4,6 +4,8 @@ import { answerAndRecord, type Mode } from '@/lib/runs';
 import { can, studentOfUser } from '@/lib/data';
 import { solvedToday, streakUpdate } from '@/lib/streak';
 import { practiceAccess } from '@/lib/staff';
+import { practiceItem } from '@/lib/bank';
+import { one } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +31,13 @@ export async function POST(req: Request) {
   if (mode === 'mistakes') {
     const student = await studentOfUser(user.id);
     if (!can(await practiceAccess(user, student), 'trainer')) return NextResponse.json({ error: 'Работа над ошибками открыта ученикам школы' }, { status: 403 });
+  }
+
+  // Задачи пробников здесь проверяются только в работе над ошибками, то есть после того,
+  // как ученик уже сдал пробник с этой задачей. Иначе ответы идущего пробника можно было бы узнать отсюда.
+  if (!practiceItem(id)) {
+    const met = await one`select 1 from bc_attempts where user_id = ${user.id} and question_id = ${id} limit 1`;
+    if (!met) return NextResponse.json({ error: 'Задача не найдена' }, { status: 404 });
   }
 
   const before = await solvedToday(user.id);
