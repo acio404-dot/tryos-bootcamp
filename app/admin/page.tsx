@@ -7,6 +7,7 @@ import { streaksOf } from '@/lib/streak';
 import { mockBatches } from '@/lib/mock';
 import { botName, botReady, webhookInfo } from '@/lib/telegram';
 import { TZ, nowInTz } from '@/lib/data';
+import { homeworkOfGroups, homeworkTopics } from '@/lib/homework';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Админка' };
@@ -28,14 +29,16 @@ export default async function Admin() {
        from bc_scores order by date desc, id desc`,
     db`select id, group_id, student_id, kind, title, scope, batch, link, note,
          to_char(at at time zone ${TZ}, 'YYYY-MM-DD HH24:MI') as at
-       from bc_events where at > now() - interval '30 days' order by at`,
+       from bc_events where at > now() - interval '30 days'
+         and (batch is null or batch not like 'hw:%') -- сроки домашек ведёт вкладка «Домашка»
+       order by at`,
     db`select count(*)::int as n from bc_users`,
     db`select t.id, t.name, t.phone, t.note, t.user_id, u.username, u.tg_username, u.email,
          to_char(u.last_seen, 'YYYY-MM-DD') as last_seen
        from bc_teachers t left join bc_users u on u.id = t.user_id order by t.name`,
   ]);
 
-  const [streaks, mocks, mockExams] = await Promise.all([
+  const [streaks, mocks, mockExams, homework] = await Promise.all([
     streaksOf(students.map((s: any) => s.user_id)),
     mockBatches(),
     // проведённые тестирования из расписания — чтобы внести по ним баллы
@@ -43,6 +46,7 @@ export default async function Admin() {
         to_char(at at time zone ${TZ}, 'YYYY-MM-DD') as day
       from bc_events where kind = 'exam' and at > now() - interval '180 days' and at < now() + interval '1 day'
       order by at desc limit 80`,
+    homeworkOfGroups((groups as any[]).map((g) => g.id)),
   ]);
   for (const s of students as any[]) s.streak = s.user_id ? streaks[s.user_id] || 0 : 0;
 
@@ -85,6 +89,8 @@ export default async function Admin() {
         tg={tg}
         server={server}
         today={nowInTz().date}
+        homework={homework}
+        hwTopics={homeworkTopics()}
       />
     </Shell>
   );
