@@ -13,7 +13,12 @@ import { navStats } from '@/lib/nav';
 import { topicInfo } from '@/lib/bank';
 import { streakOf } from '@/lib/streak';
 import StreakCard from '@/components/StreakCard';
-import { DOW_FULL, dateRu, daysBetween, firstName, plural, whenRu } from '@/lib/format';
+import { DOW_FULL, dateRu, daysBetween, dueRu, firstName, plural, whenRu } from '@/lib/format';
+import StartRun from '@/components/StartRun';
+import { homeworkOfStudent } from '@/lib/homework';
+import { lightOf } from '@/lib/light';
+import { SHIFT_MINUTES, buildShift, countKinds, openShift as findOpenShift, planText, shiftsToday } from '@/lib/sets';
+import './shift/run.css';
 import { practiceAccess } from '@/lib/staff';
 
 export const dynamic = 'force-dynamic';
@@ -33,13 +38,17 @@ export default async function Home() {
   const now = nowInTz();
   const access = student?.access;
 
-  const [groups, progress, scores, stats, streak, practice] = await Promise.all([
+  const [groups, progress, scores, stats, streak, practice, shifts, homework, light, runningShift] = await Promise.all([
     student && can(access, 'schedule') ? groupsOfStudent(student.id) : Promise.resolve([]),
     progressOf(user.id, student?.id),
     student && can(access, 'scores') ? scoresOf(student.id) : Promise.resolve([]),
     navStats(user.id, student?.id),
     streakOf(user.id),
     practiceAccess(user, student),
+    shiftsToday(user.id),
+    student ? homeworkOfStudent(student.id, user.id) : Promise.resolve([]),
+    lightOf(user.id),
+    findOpenShift(user.id),
   ]);
   const lessons = await withLessonInfo(upcomingLessons(groups, 14, 1));
   const events = student && can(access, 'schedule')
@@ -66,35 +75,47 @@ export default async function Home() {
   const lesson = lessons[0] || null;
   const lessonLink = lesson ? (lesson.link !== undefined ? lesson.link : lesson.group.link) : null;
 
-  /* Одно главное дело на сегодня: долги из ошибок → слабая тема → диагностика → выживание. */
+  /* Главное на сегодня — смена: восемь задач, которые платформа собрала сама.
+     Когда смена закрыта, карточка предлагает следующий шаг: ошибки → диагностика → выживание. */
   const worst = weak.find((t) => t.pct < 70);
-  const plan = trainerOpen && stats.mistakes > 0
+  const openShift = runningShift;
+  const doneShifts = shifts.filter((x) => x.finished);
+  const lastShift = doneShifts[doneShifts.length - 1] || null;
+  const shiftLight = doneShifts.reduce((n, x) => n + x.light, 0);
+  const tasks = (n: number) => `${n} ${plural(n, 'задача', 'задачи', 'задач')}`;
+  const after = trainerOpen && stats.mistakes > 0
+    ? { href: '/mistakes', cta: 'Разобрать ошибки', text: `В работе над ошибками ${tasks(stats.mistakes)}: решишь верно — задача уходит из списка.`, say: <>Смена закрыта. Остались долги: <b>{tasks(stats.mistakes)}</b> из ошибок.</> }
+    : !progress.tests.length
+      ? { href: '/exam', cta: 'К пробникам', text: 'Быстрая диагностика: 20 задач за 25 минут покажут балл и темы, которые тянут его вниз.', say: <>Смена закрыта. Теперь <b>диагностика</b>: 20 задач, и станет видно, куда светить.</> }
+      : { href: '/survival', cta: 'Зажечь свет', text: 'Выживание: задачи одна за другой, 90 секунд на каждую и три лампочки.', say: <>Смена закрыта. Проверим <b>темп</b> в выживании?</> };
+  const planItems = !openShift && !lastShift ? await buildShift(user.id, trainerOpen) : [];
+  const plan = openShift
     ? {
-      title: `Работа над ошибками: ${stats.mistakes} ${plural(stats.mistakes, 'задача', 'задачи', 'задач')}`,
-      text: 'Здесь задачи, где последний ответ был неверным. Решишь верно — задача уходит из списка сама.',
-      href: '/mistakes', cta: 'Разобрать ошибки',
-      say: <>Сначала долги: <b>{stats.mistakes} {plural(stats.mistakes, 'задача', 'задачи', 'задач')}</b> из ошибок {plural(stats.mistakes, 'ждёт', 'ждут', 'ждут')} второго захода.</>,
+      state: 'open' as const,
+      kicker: 'Смена на сегодня',
+      title: `Задача ${openShift.cur + 1} из ${openShift.items.length}`,
+      text: `Смена начата: решено ${openShift.done} из ${openShift.items.length}${openShift.light ? `, +${openShift.light} света` : ''}. Продолжишь с той же задачи.`,
+      say: <>Смена ждёт: <b>задача {openShift.cur + 1} из {openShift.items.length}</b>. Продолжим?</>,
     }
-    : trainerOpen && worst
+    : lastShift
       ? {
-        title: `Подтянуть: ${worst.label}`,
-        text: `Точность ${worst.pct} % на ${worst.total} ${plural(worst.total, 'задаче', 'задачах', 'задачах')}. Двадцать задач темы, разбор сразу после ответа.`,
-        href: `/trainer/${encodeURIComponent(worst.topic)}`, cta: 'Тренировать',
-        say: <>Слабое место сегодня — <b>{worst.label.toLowerCase()}</b>. Посветить?</>,
+        state: 'done' as const,
+        kicker: doneShifts.length > 1 ? `Смен сегодня: ${doneShifts.length}` : 'Смена закрыта',
+        title: `${lastShift.ok1} из ${lastShift.items.length} с первой попытки · +${shiftLight} света`,
+        text: after.text,
+        say: after.say,
       }
-      : !progress.tests.length
-        ? {
-          title: 'Быстрая диагностика: 20 задач',
-          text: 'Двадцать задач за 25 минут в формате экзамена. Покажет текущий балл и темы, которые тянут его вниз.',
-          href: '/exam', cta: 'К пробникам',
-          say: <>Начнём с диагностики: <b>20 задач</b>, и станет видно, куда светить.</>,
-        }
-        : {
-          title: 'Проверь темп: выживание',
-          text: 'Задачи одна за другой, 90 секунд на каждую и три лампочки. Экзамен даёт на задачу 75 секунд.',
-          href: '/survival', cta: 'Зажечь свет',
-          say: trainerOpen ? <>Долгов нет. Проверим <b>темп</b>: 90 секунд на задачу?</> : <>Проверим <b>темп</b>: 90 секунд на задачу?</>,
-        };
+      : {
+        state: 'new' as const,
+        kicker: 'Смена на сегодня',
+        title: `${tasks(planItems.length)} · ${SHIFT_MINUTES} минут`,
+        text: trainerOpen
+          ? `${planText(countKinds(planItems))}. Ошибёшься — Nur подскажет и даст вторую попытку.`
+          : 'Восемь задач из разных тем. Ошибёшься — Nur подскажет и даст вторую попытку.',
+        say: <>Начнём со <b>смены</b>?</>,
+      };
+  /* Ближайшая несданная домашка. */
+  const hw = homework.find((h) => !h.finished) || null;
 
   /* Настроение и первая фраза Nur. С 02:00 до 06:00 он выключен и молчит. */
   const hour = Math.floor(now.minutes / 60);
@@ -144,22 +165,41 @@ export default async function Home() {
       ) : null}
 
       <div className="grid g-2 home-main">
-        <section className="plan" aria-label="Главное на сегодня">
-          <span className="kicker">Главное на сегодня</span>
-          <h2>{plan.title}</h2>
-          <p>{plan.text}</p>
-          {trainerOpen && weak.some((t) => t.pct < 70) ? (
-            <div className="plan-chips">
-              {weak.filter((t) => t.pct < 70).slice(0, 3).map((t) => (
-                <Link key={t.topic} className={`chip${t.pct < 55 ? ' chip-coral' : ''}`} href={`/trainer/${encodeURIComponent(t.topic)}`}>{t.label} · {t.pct} %</Link>
-              ))}
+        <div className="home-today">
+          <section className={`plan${plan.state === 'done' ? ' done' : ''}`} aria-label="Главное на сегодня">
+            <span className="kicker">{plan.kicker}</span>
+            <h2>{plan.title}</h2>
+            <p>{plan.text}</p>
+            {plan.state === 'done' && trainerOpen && worst ? (
+              <div className="plan-chips">
+                {weak.filter((t) => t.pct < 70).slice(0, 3).map((t) => (
+                  <Link key={t.topic} className={`chip${t.pct < 55 ? ' chip-coral' : ''}`} href={`/trainer/${encodeURIComponent(t.topic)}`}>{t.label} · {t.pct} %</Link>
+                ))}
+              </div>
+            ) : null}
+            <div className="plan-act">
+              {plan.state === 'new' ? <StartRun action="start-shift" to="/shift" label="Начать смену" />
+                : plan.state === 'open' ? <Link className="btn btn-dark btn-lg" href="/shift">Продолжить смену <IArrow /></Link>
+                  : <Link className="btn btn-dark btn-lg" href={after.href}>{after.cta} <IArrow /></Link>}
+              <span>
+                {plan.state === 'done'
+                  ? <Link href="/shift">Итоги смены и ещё одна →</Link>
+                  : streak.today ? `Стрик на сегодня засчитан: ${streak.current} ${plural(streak.current, 'день', 'дня', 'дней')}` : streak.current ? `Решишь задачу — стрик станет ${streak.current + 1} ${plural(streak.current + 1, 'день', 'дня', 'дней')}` : 'Реши любую задачу — начнётся стрик'}
+              </span>
             </div>
+          </section>
+          {hw ? (
+            <Link className="rowlink hw-row" href={`/homework/${hw.id}`}>
+              <Ico name="homework" />
+              <span className="txt">
+                <b>Домашка: {hw.title}</b>
+                <i>{hw.done} из {hw.count} · {hw.overdue ? 'срок прошёл, сдать ещё можно' : dueRu(now.date, hw.day, hw.time)}</i>
+              </span>
+              <span className="act">{hw.started ? 'Продолжить →' : 'Начать →'}</span>
+              <span className="bar" aria-hidden="true"><i style={{ width: `${Math.round((hw.done / hw.count) * 100)}%` }} /></span>
+            </Link>
           ) : null}
-          <div className="plan-act">
-            <Link className="btn btn-dark btn-lg" href={plan.href}>{plan.cta} <IArrow /></Link>
-            <span>{streak.today ? `Стрик на сегодня засчитан: ${streak.current} ${plural(streak.current, 'день', 'дня', 'дней')}` : streak.current ? `Решишь задачу — стрик станет ${streak.current + 1} ${plural(streak.current + 1, 'день', 'дня', 'дней')}` : 'Реши любую задачу — начнётся стрик'}</span>
-          </div>
-        </section>
+        </div>
 
         <div className="m-hide"><NextLessonCard lesson={lesson} today={now.date} /></div>
         {lesson ? (
@@ -179,9 +219,9 @@ export default async function Home() {
             <b className="warm">{lastScore ?? '—'}</b>
             <span>{lastScore === null ? 'балл пробника' : exam?.target ? `балл · цель ${exam.target}` : 'последний балл'}</span>
           </Link>
-          <Link className="stat" href="/progress">
-            <b>{progress.week}</b>
-            <span>{plural(progress.week, 'задача', 'задачи', 'задач')} за неделю</span>
+          <Link className="stat" href="/shift">
+            <b>{light.total.toLocaleString('ru-RU')}</b>
+            <span>{light.today ? `света · +${light.today} сегодня` : 'света'}</span>
           </Link>
         </div>
       </div>
@@ -199,7 +239,12 @@ export default async function Home() {
         </Link>
       </div>
 
-      <div className="grid g-3 mt m-hide">
+      <div className="grid g-4 mt m-hide">
+        <div className="tile">
+          <span>Свет</span>
+          <b>{light.total.toLocaleString('ru-RU')}</b>
+          <i>{light.today ? <><span className="up">+{light.today}</span> сегодня</> : light.week ? `+${light.week} за неделю` : 'за верные ответы в смене'}</i>
+        </div>
         <div className="tile">
           <span>Последний тест</span>
           <b>{lastScore ?? '—'}</b>
@@ -252,7 +297,7 @@ export default async function Home() {
                     <i>
                       {e.kind === 'deadline' ? 'Срок сдачи' : e.kind === 'exam' ? 'Тестирование' : 'Доп. занятие'}
                       {' · '}{dateRu(e.day, false)}
-                      {e.kind !== 'deadline' ? `, ${e.time}` : ''}
+                      {e.kind !== 'deadline' || e.time !== '23:59' ? `, ${e.time}` : ''}
                       {e.note ? ` · ${e.note}` : ''}
                     </i>
                   </span>
