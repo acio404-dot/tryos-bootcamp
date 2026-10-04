@@ -113,13 +113,6 @@
 .sv-task .qfig svg{max-width:400px}
 .sv-task .qopts{margin-top:16px}
 .sv-task .qopt:hover:not(:disabled){box-shadow:3px 3px 0 #101a2c}
-/* короткие ответы — пять плиток в ряд */
-.qopts.tiles{grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
-.qopts.tiles .qopt{flex-direction:column;justify-content:center;gap:6px;min-height:64px;padding:8px 4px;text-align:center;border:2px solid var(--ink);border-radius:14px}
-.qopts.tiles .qopt.on,.qopts.tiles .qopt.ok,.qopts.tiles .qopt.bad{padding:8px 4px}
-.qopts.tiles .ql{width:auto;height:auto;border:0;background:none;font:700 11px/1 var(--mono);color:var(--muted)}
-.qopts.tiles .qopt.on .ql,.qopts.tiles .qopt.ok .ql,.qopts.tiles .qopt.bad .ql{background:none;color:inherit}
-.qopts.tiles .qo{flex:0 0 auto;font-family:var(--display);font-weight:800;font-size:19px;line-height:1;letter-spacing:-.03em}
 .sv-foot{margin:14px 0 0;font-size:14px;font-weight:600;line-height:1.4;color:var(--muted)}
 .sv-task .qact{margin-top:16px}
 
@@ -232,8 +225,6 @@
   .sv-mvoice.dazed{border-color:rgba(111,227,211,.5);color:#cdf3ea}
   .sv-task{padding:16px 16px 18px;border-radius:22px}
   .sv-task .qtext{font-size:16.5px}
-  .qopts.tiles{gap:8px}
-  .qopts.tiles .qo{font-size:17px}
   .sv-path{display:none}
   .sv-mend{display:flex;justify-content:center;padding:0 16px calc(18px + env(safe-area-inset-bottom))}
   .sv-mend .sv-btn{border:0;color:var(--dim-n);font-size:15px}
