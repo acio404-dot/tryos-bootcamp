@@ -554,15 +554,45 @@ export function gradeExam(ids: string[], answers: (number | null)[]): ExamResult
 
 /* ------------------------------------------------------ режим выживания */
 
-/** Чем длиннее серия, тем реже попадаются короткие темы и тем чаще — тяжёлые. */
-export function survivalPick(streak: number, exclude: Set<string>): Item | null {
-  const pool = PRACTICE.filter((q) => !exclude.has(q.id));
-  if (!pool.length) return null;
-  // До 5 верных подряд — любая тема; дальше упор на геометрию и математику,
-  // где задачи в банке длиннее и считаются дольше.
-  const hard = streak >= 5 ? pool.filter((q) => q.section !== 'iq') : pool;
-  const from = hard.length > 40 ? hard : pool;
-  return from[Math.floor(Math.random() * from.length)];
+/** Волна = каждые пять верных подряд. */
+export const WAVE_SIZE = 5;
+export const waveOf = (streak: number) => Math.floor(Math.max(0, streak) / WAVE_SIZE);
+/**
+ * Раздел волны. В первой волне тени идут из всех разделов вперемешку (null),
+ * дальше каждая волна — один раздел: алгебра, геометрия, логика и снова по кругу.
+ */
+const WAVE_SECTIONS: Section[] = ['algebra', 'geometry', 'iq'];
+export const waveSection = (streak: number): Section | null => {
+  const w = waveOf(streak);
+  return w === 0 ? null : WAVE_SECTIONS[(w - 1) % WAVE_SECTIONS.length];
+};
+
+const TOPICS_BY_SECTION = new Map<Section, string[]>();
+for (const [key, list] of BY_TOPIC) {
+  const sec = list[0].section;
+  TOPICS_BY_SECTION.set(sec, [...(TOPICS_BY_SECTION.get(sec) || []), key]);
+}
+
+/**
+ * Задача для выживания. Раздел задаёт волна; сначала выбирается тема (тень),
+ * потом задача в ней — так все тени раздела выходят одинаково часто, а одна
+ * и та же тень не идёт дважды подряд (recentTopics — темы последних задач).
+ */
+export function survivalPick(streak: number, exclude: Set<string>, recentTopics: string[] = []): Item | null {
+  const recent = new Set(recentTopics);
+  const sec = waveSection(streak);
+  const all = [...BY_TOPIC.keys()];
+  // сначала темы раздела волны, потом (если в нём всё решено) — любые
+  const groups = sec ? [TOPICS_BY_SECTION.get(sec) || [], all] : [all];
+  for (const avoidRecent of [true, false]) {
+    for (const group of groups) {
+      for (const t of shuffle(group.filter((k) => !avoidRecent || !recent.has(k)))) {
+        const pool = (BY_TOPIC.get(t) || []).filter((q) => !exclude.has(q.id));
+        if (pool.length) return pool[Math.floor(Math.random() * pool.length)];
+      }
+    }
+  }
+  return null;
 }
 
 export { FORMATS, SECTION_LABEL, SECTION_BOOK, formatByKey };

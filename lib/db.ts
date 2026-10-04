@@ -219,6 +219,12 @@ const SCHEMA: ((q: Q) => any)[] = [
   // Таймер задачи в выживании: когда задача выдана и когда ученик её увидел.
   (q) => q`alter table bc_survival add column if not exists cur_issued timestamptz`,
   (q) => q`alter table bc_survival add column if not exists cur_at timestamptz`,
+  // Кто погасил лампочки: [{n, id, topic, timedOut}] — для финала серии и «Реванша».
+  (q) => q`alter table bc_survival add column if not exists lost jsonb not null default '[]'::jsonb`,
+  // Таблица недели: лучшие серии, начатые с понедельника.
+  (q) => q`create index if not exists bc_survival_week on bc_survival (started_at)`,
+  // Сколько секунд ушло на задачу (там, где идёт таймер): нужно для «победы над тенью» — верно и быстрее 75 секунд.
+  (q) => q`alter table bc_attempts add column if not exists seconds real`,
 ];
 
 const SCHEMA_VERSION = createHash('sha1').update(SCHEMA.map((f) => f.toString()).join('\n')).digest('hex').slice(0, 16);

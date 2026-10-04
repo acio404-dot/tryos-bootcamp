@@ -7,6 +7,7 @@ import { cache } from 'react';
 import { randomBytes } from 'node:crypto';
 import { db, one } from './db';
 import { checkAnswer, isActiveId, type Section } from './bank';
+import { addDays, nowInTz, TZ } from './data';
 
 export const newId = () => randomBytes(9).toString('base64url');
 
@@ -20,9 +21,11 @@ export async function recordAttempt(
   q: { id: string; topic: string; topicLabel: string; section: Section },
   correct: boolean,
   mode: Mode,
+  /** Сколько секунд ушло на задачу — там, где идёт таймер. */
+  seconds: number | null = null,
 ): Promise<void> {
-  await db`insert into bc_attempts (user_id, question_id, topic, topic_label, section, correct, mode)
-    values (${userId}, ${q.id}, ${q.topic}, ${q.topicLabel}, ${q.section}, ${correct}, ${mode})`;
+  await db`insert into bc_attempts (user_id, question_id, topic, topic_label, section, correct, mode, seconds)
+    values (${userId}, ${q.id}, ${q.topic}, ${q.topicLabel}, ${q.section}, ${correct}, ${mode}, ${seconds})`;
 }
 
 export async function recordAttempts(
@@ -194,7 +197,19 @@ export async function survivalRun(userId: string, id: string): Promise<Survival 
 
 export async function setSurvivalCurrent(id: string, questionId: string, seen: string[]): Promise<void> {
   await db`update bc_survival set cur_id = ${questionId}, seen = ${JSON.stringify(seen)}::jsonb,
-    asked = asked + 1, cur_issued = now(), cur_at = null where id = ${id}`;
+    asked = asked + 1, cur_issued = now(), cur_at = now() where id = ${id}`;
+}
+
+/**
+ * Забрать текущую задачу серии под ответ. Только один запрос получит строку:
+ * повторный или параллельный ответ на ту же задачу вернёт null. Так ответ
+ * нельзя засчитать дважды, а ответ «в догонку» не попадёт на следующую задачу.
+ */
+export async function claimSurvivalAnswer(userId: string, id: string, questionId: string): Promise<Survival | null> {
+  return one<Survival>`update bc_survival set cur_id = null
+    where id = ${id} and user_id = ${userId} and alive and cur_id = ${questionId}
+    returning id, user_id, streak, best, lives, asked, ${questionId}::text as cur_id, seen, alive,
+      extract(epoch from now() - coalesce(cur_at, cur_issued))::float as elapsed`;
 }
 
 /**
@@ -207,13 +222,18 @@ export async function markSurvivalShown(userId: string, id: string): Promise<voi
     where id = ${id} and user_id = ${userId} and cur_id is not null and cur_at is null and alive`;
 }
 
-export async function applySurvivalAnswer(run: Survival, ok: boolean): Promise<Survival> {
+/** lost — кто погасил лампочку: запись добавляется при неверном или просроченном ответе. */
+export async function applySurvivalAnswer(
+  run: Survival, ok: boolean, lost?: { id: string; topic: string; timedOut: boolean },
+): Promise<Survival> {
   const streak = ok ? run.streak + 1 : 0;
   const best = Math.max(run.best, streak);
   const lives = ok ? run.lives : run.lives - 1;
   const alive = lives > 0;
+  const add = !ok && lost ? JSON.stringify([{ n: run.asked, ...lost }]) : '[]';
   await db`update bc_survival set streak = ${streak}, best = ${best}, lives = ${lives}, alive = ${alive},
-    cur_id = null, ended_at = case when ${alive} then ended_at else coalesce(ended_at, now()) end
+    cur_id = null, lost = lost || ${add}::jsonb,
+    ended_at = case when ${alive} then ended_at else coalesce(ended_at, now()) end
     where id = ${run.id}`;
   return { ...run, streak, best, lives, alive, cur_id: null };
 }
@@ -243,6 +263,93 @@ export async function survivalBoard(userId: string, limit = 20): Promise<BoardRo
     at: r.at,
     me: r.user_id === userId,
   }));
+}
+
+export interface WeekRow { userId: string; name: string; best: number; me: boolean }
+export interface WeekBoard {
+  /** group — одногруппники; school — все ученики (если группы нет или в ней пока один человек). */
+  scope: 'group' | 'school';
+  title: string;
+  /** Лучшие по убыванию серии; своя строка есть всегда. */
+  rows: WeekRow[];
+  /** Сколько человек в таблице всего и какое место у ученика (среди всех, а не только показанных). */
+  total: number;
+  place: number;
+  /** Ближайший соперник выше в таблице. */
+  above: { name: string; best: number } | null;
+  /** Понедельник текущей недели по времени школы, 'YYYY-MM-DD'. */
+  since: string;
+}
+
+/** В таблице школы фамилии не показываем: «Regina A.». */
+const publicName = (name: string, username?: string | null) => {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return username ? `@${username}` : 'Ученик';
+  return parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : parts[0];
+};
+
+function boardOf(scope: 'group' | 'school', title: string, since: string, all: WeekRow[], limit: number): WeekBoard {
+  const sorted = [...all].sort((a, b) => b.best - a.best || Number(b.me) - Number(a.me) || a.name.localeCompare(b.name));
+  const i = sorted.findIndex((r) => r.me);
+  const mine = sorted[i];
+  // соперник выше — ближайший с серией больше моей
+  const above = [...sorted.slice(0, Math.max(0, i))].reverse().find((r) => r.best > (mine?.best ?? 0)) || null;
+  const rows = sorted.slice(0, limit);
+  if (mine && !rows.some((r) => r.me)) rows.push(mine);
+  return { scope, title, since, rows, total: sorted.length, place: i + 1, above: above ? { name: above.name, best: above.best } : null };
+}
+
+/**
+ * Таблица недели: лучшая серия каждого с понедельника (по времени школы).
+ * Ученику показываем его группу — соревноваться интереснее со своими;
+ * если группы нет, показываем школу (без сотрудников). В понедельник таблица начинается заново.
+ */
+export async function survivalWeek(userId: string, studentId?: string | null, limit = 8): Promise<WeekBoard> {
+  const now = nowInTz();
+  const since = addDays(now.date, -(now.dow - 1));
+  if (studentId) {
+    const rows = await db<{ user_id: string; name: string; best: number; course: string; gname: string; groups: number }>`
+      with mates as (
+        select distinct s2.user_id, s2.name
+        from bc_members m1
+          join bc_groups g on g.id = m1.group_id and g.kind = 'group'
+          join bc_members m2 on m2.group_id = m1.group_id
+          join bc_students s2 on s2.id = m2.student_id
+        where m1.student_id = ${studentId} and s2.user_id is not null
+      ), grp as (
+        select min(g.course) as course, min(g.name) as gname, count(*)::int as groups
+        from bc_members m join bc_groups g on g.id = m.group_id and g.kind = 'group'
+        where m.student_id = ${studentId}
+      )
+      select mates.user_id, mates.name, grp.course, grp.gname, grp.groups,
+        coalesce((select max(s.best) from bc_survival s
+          where s.user_id = mates.user_id and s.started_at >= (${since}::date)::timestamp at time zone ${TZ}), 0)::int as best
+      from mates, grp`;
+    if (rows.length >= 2 && rows.some((r) => r.user_id === userId)) {
+      const g = rows[0];
+      const title = g.groups === 1 ? `${g.course}${g.gname ? ` · ${g.gname}` : ''}` : 'Твои группы';
+      return boardOf('group', title, since,
+        rows.map((r) => ({ userId: r.user_id, name: r.name || 'Ученик', best: r.best, me: r.user_id === userId })), limit);
+    }
+  }
+  // школа: все, кто играл на этой неделе, кроме сотрудников (учителей и админов)
+  const rows = await db<{ user_id: string; name: string; username: string | null; best: number }>`
+    select s.user_id, u.name, u.username, max(s.best)::int as best
+    from bc_survival s join bc_users u on u.id = s.user_id
+    where s.started_at >= (${since}::date)::timestamp at time zone ${TZ} and s.best > 0
+      and (s.user_id = ${userId} or (u.role <> 'admin' and not exists (select 1 from bc_teachers t where t.user_id = u.id)))
+    group by s.user_id, u.name, u.username
+    order by best desc
+    limit 500`;
+  const all = rows.map((r) => ({ userId: r.user_id, name: publicName(r.name, r.username), best: r.best, me: r.user_id === userId }));
+  if (!all.some((r) => r.me)) all.push({ userId, name: 'Ты', best: 0, me: true });
+  return boardOf('school', 'Школа', since, all, limit);
+}
+
+/** Рекорд школы за всё время. */
+export async function schoolBestSurvival(): Promise<number> {
+  const r = await one<{ b: number }>`select coalesce(max(best), 0)::int as b from bc_survival`;
+  return r?.b ?? 0;
 }
 
 export async function myBestSurvival(userId: string): Promise<number> {
