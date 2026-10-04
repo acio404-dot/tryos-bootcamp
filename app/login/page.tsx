@@ -17,7 +17,7 @@ export default async function Login({ searchParams }: { searchParams: { error?: 
   return (
     <div className="auth">
       <aside className="auth-side">
-        <Brand dark href="https://www.tryoszone.com" />
+        <Brand anim href="https://www.tryoszone.com" />
         <div>
           <div className="auth-nur">
             <Nur mood="default" width={112} />
