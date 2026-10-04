@@ -22,7 +22,7 @@ interface Item { tab: Tab; href: string; label: string; ico: IcoName; note?: str
 
 /* Каркас кабинета: слева меню из трёх блоков, на телефоне — нижняя панель из пяти вкладок. */
 export default async function Shell({
-  user, student, active, children, streak,
+  user, student, active, children, streak, tone,
 }: {
   user: User;
   student: Student | null;
@@ -30,6 +30,8 @@ export default async function Shell({
   children: React.ReactNode;
   /** Стрик, если страница его уже посчитала; иначе посчитаем здесь. */
   streak?: StreakInfo;
+  /** night — тёмная страница (выживание). */
+  tone?: 'night';
 }) {
   // Стрик и числа для меню нужны на каждой странице.
   const [s, teacher, stats, access] = await Promise.all([
@@ -131,7 +133,7 @@ export default async function Shell({
         </div>
       </aside>
 
-      <main className="main">{children}</main>
+      <main className={`main${tone === 'night' ? ' is-night' : ''}`}>{children}</main>
       {s ? <StreakCelebrate current={s.current} today={s.today} date={s.date} /> : null}
 
       <nav className="tabbar" aria-label="Разделы">
