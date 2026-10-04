@@ -344,14 +344,19 @@ function scopeFigure(svg: string | undefined, id: string): string | undefined {
     .replace(/style='([^']*font-[^']*fill:#ffffff)'/g, "style='$1;stroke:none !important'");
 }
 
-export const toPublic = (q: Item): PublicQuestion => ({
-  id: q.id,
+/**
+ * Задача для ученика. alias — подставной id вместо настоящего: в режимах, где
+ * ответ что-то стоит (смена, домашка, выживание), настоящий id в браузер не уходит,
+ * иначе ответ можно было бы узнать через тренажёр или открытое API банка.
+ */
+export const toPublic = (q: Item, alias?: string): PublicQuestion => ({
+  id: alias ?? q.id,
   topic: q.topic,
   topicLabel: q.topicLabel,
   section: q.section,
   text: q.text,
   options: q.options.map(decode),
-  figure: scopeFigure(q.figure, q.id),
+  figure: scopeFigure(q.figure, alias ?? q.id),
 });
 
 export function itemById(id: string): Item | undefined {
@@ -418,7 +423,7 @@ function diversified(list: Item[]): Item[] {
 export function topicQuestions(key: string, limit = 20): PublicQuestion[] {
   const info = topicInfo(key);
   if (!info) return [];
-  if (!info.mixed) return diversified(BY_TOPIC.get(info.key) || []).slice(0, limit).map(toPublic);
+  if (!info.mixed) return diversified(BY_TOPIC.get(info.key) || []).slice(0, limit).map((q) => toPublic(q));
 
   const group = CATALOG.find((g) => g.key === info.section);
   if (!group) return [];
@@ -430,8 +435,23 @@ export function topicQuestions(key: string, limit = 20): PublicQuestion[] {
       if (pool[round]) out.push(pool[round]);
     }
   }
-  return out.map(toPublic);
+  return out.map((q) => toPublic(q));
 }
+
+/** n задач темы: сначала те, что ученик ещё не решал (avoid — уже решённые), типы задач чередуются. */
+export function pickFromTopic(key: string, n: number, avoid: Set<string> = new Set()): Item[] {
+  const all = diversified(BY_TOPIC.get(key) || []);
+  const fresh = all.filter((q) => !avoid.has(q.id));
+  return [...fresh, ...all.filter((q) => avoid.has(q.id))].slice(0, n);
+}
+
+/** Темы каталога по порядку: от простых форматов к сложным внутри раздела. */
+export function catalogTopics(): Topic[] {
+  return CATALOG.flatMap((g) => g.topics);
+}
+
+/** Тема выдаётся ученикам (есть в каталоге тренажёра). */
+export const isActiveTopic = (key: string): boolean => BY_TOPIC.has(key);
 
 /* --------------------------------------------------------------- пробник */
 

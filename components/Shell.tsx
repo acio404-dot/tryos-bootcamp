@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { isAdmin, type User } from '@/lib/auth';
 import { can, teacherOfUser, type Student } from '@/lib/data';
 import { TOTAL_TOPICS } from '@/lib/bank';
-import { plural } from '@/lib/format';
+import { dueShort, plural } from '@/lib/format';
+import { nowInTz } from '@/lib/data';
+import { SHIFT_SIZE } from '@/lib/set-types';
 import { navStats } from '@/lib/nav';
 import { practiceAccess } from '@/lib/staff';
 import { streakOf, type StreakInfo } from '@/lib/streak';
@@ -14,11 +16,11 @@ import StreakCelebrate from './StreakCelebrate';
 import MobileMenu, { MenuButton } from './MobileMenu';
 import { Ico, ILogout, type IcoName } from './icons';
 
-export type Tab = 'home' | 'practice' | 'exam' | 'trainer' | 'mistakes' | 'survival' | 'courses' | 'schedule' | 'progress' | 'settings' | 'admin' | 'teach';
+export type Tab = 'home' | 'shift' | 'homework' | 'practice' | 'exam' | 'trainer' | 'mistakes' | 'survival' | 'courses' | 'schedule' | 'progress' | 'settings' | 'admin' | 'teach';
 
 const MAIN = 'https://www.tryoszone.com';
 
-interface Item { tab: Tab; href: string; label: string; ico: IcoName; note?: string }
+interface Item { tab: Tab; href: string; label: string; ico: IcoName; note?: string; pill?: boolean; hot?: boolean }
 
 /* Каркас кабинета: слева меню из трёх блоков, на телефоне — нижняя панель из пяти вкладок. */
 export default async function Shell({
@@ -51,7 +53,16 @@ export default async function Shell({
   // Разделы про курсы ученика им не нужны; режимы решения задач открыты.
   const staffOnly = !student && Boolean(teacher || admin);
 
-  const today: Item[] = staffOnly ? [] : [{ tab: 'home', href: '/', label: 'Главная', ico: 'home' }];
+  // Смена: сколько задач ждёт. Домашка: сколько заданий и срок ближайшего.
+  const sh = stats?.shift;
+  const shiftNote = !sh || sh.state === 'none' ? `${SHIFT_SIZE} задач` : sh.state === 'open' ? `${sh.cur + 1} из ${sh.total}` : 'закрыта';
+  const hw = stats?.homework;
+  const hwNote = hw?.waiting ? (hw.overdue ? 'срок прошёл' : hw.day ? dueShort(nowInTz().date, hw.day) : String(hw.waiting)) : '';
+  const today: Item[] = [
+    ...(staffOnly ? [] : [{ tab: 'home', href: '/', label: 'Главная', ico: 'home' }] as Item[]),
+    { tab: 'shift', href: '/shift', label: 'Смена', ico: 'shift', note: shiftNote, pill: sh?.state !== 'done' },
+    ...(student ? [{ tab: 'homework', href: '/homework', label: 'Домашка', ico: 'homework', note: hwNote, pill: Boolean(hwNote), hot: Boolean(hw?.overdue) }] as Item[] : []),
+  ];
   const work: Item[] = [
     ...(teacher ? [{ tab: 'teach', href: '/teach', label: 'Мои группы', ico: 'teach' }] as Item[] : []),
     ...(admin ? [{ tab: 'admin', href: '/admin', label: 'Админка', ico: 'admin' }] as Item[] : []),
@@ -73,7 +84,7 @@ export default async function Shell({
   // Телефон: внизу пять вкладок, последняя — «Я» (профиль и остальные разделы).
   const practiceTabs: Tab[] = ['practice', 'exam', 'trainer', 'mistakes', 'survival'];
   const T: Record<string, { href: string; label: string; ico: IcoName; on: boolean }> = {
-    home: { href: '/', label: 'Сегодня', ico: 'home', on: active === 'home' },
+    home: { href: '/', label: 'Сегодня', ico: 'home', on: active === 'home' || active === 'shift' || active === 'homework' },
     modes: { href: '/practice', label: 'Режимы', ico: 'survival', on: practiceTabs.includes(active) },
     progress: { href: '/progress', label: 'Прогресс', ico: 'progress', on: active === 'progress' },
     schedule: { href: '/schedule', label: 'Расписание', ico: 'schedule', on: active === 'schedule' },
@@ -92,6 +103,7 @@ export default async function Shell({
   const row = (i: Item) => (
     <Link key={i.tab} href={i.href} className={active === i.tab ? 'on' : undefined} aria-current={active === i.tab ? 'page' : undefined}>
       <Ico name={i.ico} /><span className="lbl">{i.label}</span>
+      {i.note ? <span className={`cnt${i.pill ? ' pill' : ''}${i.hot ? ' hot' : ''}`}>{i.note}</span> : null}
     </Link>
   );
 
@@ -130,6 +142,7 @@ export default async function Shell({
             <span className="access">{level}</span>
             <a href="/api/auth/logout">Выйти</a>
           </div>
+          {stats?.light ? <span className="me-light" title="Свет: за верные ответы в смене, домашке и выживании">свет · {stats.light.toLocaleString('ru-RU')}</span> : null}
         </div>
       </aside>
 

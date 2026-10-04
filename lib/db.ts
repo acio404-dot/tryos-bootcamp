@@ -225,6 +225,62 @@ const SCHEMA: ((q: Q) => any)[] = [
   (q) => q`create index if not exists bc_survival_week on bc_survival (started_at)`,
   // Сколько секунд ушло на задачу (там, где идёт таймер): нужно для «победы над тенью» — верно и быстрее 75 секунд.
   (q) => q`alter table bc_attempts add column if not exists seconds real`,
+  // Смена и домашка: после первой ошибки даётся подсказка и вторая попытка. На задачу — одна строка:
+  // correct — верен ли первый ответ (так честнее точность по темам), try — сколько попыток ушло,
+  // fixed — решена со второй попытки.
+  (q) => q`alter table bc_attempts add column if not exists try smallint not null default 1`,
+  (q) => q`alter table bc_attempts add column if not exists fixed boolean not null default false`,
+  // Набор задач с подсказкой и второй попыткой: смена дня (kind = 'shift') и домашка от учителя ('homework').
+  // items: [{id, kind}] — задачи и откуда они (слабая тема, новая, из ошибок, домашка);
+  // answers: [{tries, ok, seconds, light}] — по записи на задачу; step растёт с каждым изменением:
+  // по нему отсекаются повторные и параллельные ответы.
+  (q) => q`create table if not exists bc_sets (
+    id text primary key,
+    user_id text not null,
+    kind text not null,
+    day date,
+    seq int not null default 1,
+    hw_id text,
+    items jsonb not null,
+    answers jsonb not null default '[]'::jsonb,
+    cur int not null default 0,
+    step int not null default 0,
+    cur_at timestamptz,
+    light int not null default 0,
+    done int not null default 0,
+    ok1 int not null default 0,
+    ok2 int not null default 0,
+    started_at timestamptz not null default now(),
+    finished_at timestamptz
+  )`,
+  (q) => q`create unique index if not exists bc_sets_shift on bc_sets (user_id, day, seq) where kind = 'shift'`,
+  (q) => q`create unique index if not exists bc_sets_hw on bc_sets (user_id, hw_id) where kind = 'homework'`,
+  // Свет — валюта кабинета: начисляется за верные ответы. Одна строка — одно начисление.
+  (q) => q`create table if not exists bc_light (
+    id bigserial primary key,
+    user_id text not null,
+    amount int not null,
+    reason text not null,
+    ref text,
+    created_at timestamptz not null default now()
+  )`,
+  (q) => q`create index if not exists bc_light_user on bc_light (user_id, created_at)`,
+  // Домашка от учителя: темы, сколько задач и срок. Каждому ученику группы — свой набор задач (bc_sets).
+  (q) => q`create table if not exists bc_homework (
+    id text primary key,
+    group_id int not null,
+    teacher_id text,
+    author text,
+    title text not null,
+    topics jsonb not null,
+    count int not null,
+    due_at timestamptz not null,
+    note text,
+    created_at timestamptz not null default now()
+  )`,
+  (q) => q`create index if not exists bc_homework_group on bc_homework (group_id, due_at)`,
+  // Одно задание сразу нескольким группам — строки с общим batch: ученик двух групп видит его один раз.
+  (q) => q`alter table bc_homework add column if not exists batch text`,
 ];
 
 const SCHEMA_VERSION = createHash('sha1').update(SCHEMA.map((f) => f.toString()).join('\n')).digest('hex').slice(0, 16);

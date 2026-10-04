@@ -12,6 +12,8 @@ import {
 import StreakBadge from './StreakBadge';
 import MockResults, { type MExam } from './MockResults';
 import type { MockBatch } from '@/lib/mock';
+import HomeworkPanel, { type HwTopic } from './HomeworkPanel';
+import type { TeacherHomework } from '@/lib/homework';
 
 export interface TStudent {
   id: string; name: string; group_id: number; streak: number; bound: boolean;
@@ -68,14 +70,16 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-type Tab = 'lessons' | 'groups' | 'students' | 'mocks' | 'scores';
+type Tab = 'lessons' | 'homework' | 'groups' | 'students' | 'mocks' | 'scores';
 
 export default function TeachPanel({
-  groups, students, lessons, events, scores, mocks, exams, today,
+  groups, students, lessons, events, scores, mocks, exams, today, homework, hwTopics,
 }: {
   groups: Group[]; students: TStudent[]; lessons: TLesson[]; events: TEvent[]; scores: TScore[];
   mocks: MockBatch[]; exams: MExam[]; today: string;
+  homework: TeacherHomework[]; hwTopics: HwTopic[];
 }) {
+  const waiting = homework.filter((h) => !h.overdue).length;
   const [tab, setTab] = useState<Tab>('lessons');
   // ученик, открытый во вкладке «Ученики» (по нажатию на имя в группе)
   const [openStudent, setOpenStudent] = useState<string | null>(null);
@@ -95,6 +99,7 @@ export default function TeachPanel({
     <div className="teach">
       <div className="tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'lessons'} className={tab === 'lessons' ? 'on' : ''} onClick={() => setTab('lessons')}>Занятия</button>
+        <button type="button" role="tab" aria-selected={tab === 'homework'} className={tab === 'homework' ? 'on' : ''} onClick={() => setTab('homework')}>Домашка{waiting ? ` · ${waiting}` : ''}</button>
         <button type="button" role="tab" aria-selected={tab === 'groups'} className={tab === 'groups' ? 'on' : ''} onClick={() => setTab('groups')}>Мои группы · {groups.length}</button>
         <button type="button" role="tab" aria-selected={tab === 'students'} className={tab === 'students' ? 'on' : ''} onClick={() => setTab('students')}>Ученики · {people.length}</button>
         <button type="button" role="tab" aria-selected={tab === 'mocks'} className={tab === 'mocks' ? 'on' : ''} onClick={() => setTab('mocks')}>Баллы за пробники</button>
@@ -106,6 +111,8 @@ export default function TeachPanel({
           <Upcoming lessons={lessons} events={events} today={today} groupOf={groupOf} colorOf={colorOf} nameOf={nameOf} />
           <NewLesson groups={groups} today={today} colorOf={colorOf} />
         </div>
+      ) : tab === 'homework' ? (
+        <HomeworkPanel groups={groups.map((g) => ({ id: g.id, title: title(g), solo: g.kind === 'solo' }))} topics={hwTopics} list={homework} today={today} />
       ) : tab === 'groups' ? (
         <div className="t-groups">
           {groups.map((g) => (

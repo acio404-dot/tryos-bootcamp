@@ -13,6 +13,7 @@ export const metadata = { title: 'Статистика ученика' };
 
 const MODE_RU: Record<string, string> = {
   practice: 'Тренажёр', mistakes: 'Работа над ошибками', survival: 'Выживание', exam: 'Пробники',
+  shift: 'Смена', homework: 'Домашка',
 };
 
 export default async function StudentPage({ params }: { params: { id: string } }) {

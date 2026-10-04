@@ -140,8 +140,8 @@ export async function runReminders(): Promise<RunResult> {
       const n = streaks[s.user_id] || 0;
       if (n < 1 || done.has(s.user_id) || !wants(s, 'streak')) continue;
       await deliver(res, `S:${s.user_id}:${now.date}`, s.chat,
-        `🔥 Стрик <b>${n} ${plural(n, 'день', 'дня', 'дней')}</b> сгорит в полночь.\nРеши хотя бы одну задачу — хватит пары минут.`,
-        [{ text: 'Решать', url: `${site}/practice` }]);
+        `🔥 Стрик <b>${n} ${plural(n, 'день', 'дня', 'дней')}</b> сгорит в полночь.\nСмена на сегодня уже собрана: 8 задач. Хватит и одной, чтобы стрик остался.`,
+        [{ text: 'Открыть смену', url: `${site}/shift` }]);
     }
   }
 

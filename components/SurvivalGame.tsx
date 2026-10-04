@@ -118,6 +118,8 @@ export default function SurvivalGame({
   const [say, setSay] = useState('');
   const [mood, setMood] = useState<NurMood>('default');
   const [lost, setLost] = useState<Lost[]>([]);
+  /** Свет, заработанный за серию. */
+  const [light, setLight] = useState(0);
   const [asleep, setAsleep] = useState(false);
   /** Время вышло, но сообщить об этом серверу не удалось (нет связи). */
   const [timedOutOffline, setTimedOutOffline] = useState(false);
@@ -177,6 +179,7 @@ export default function SurvivalGame({
       met.current = new Set(d.shadow ? [d.shadow.id] : []);
       lastLine.current = {};
       setLost([]);
+      setLight(0);
       setOver(false);
       setAsleep(nurAsleep());
       setRun({ id: d.id, question: d.question, shadow: d.shadow ?? null, streak: 0, best: 0, lives: d.lives, alive: true, n: 1, done: 0 });
@@ -223,6 +226,7 @@ export default function SurvivalGame({
       setVerdict(v);
       setTimedOutOffline(false);
       if (d.streakUp) pendingStreak.current = d.streakUp;
+      if (typeof d.light === 'number') setLight((n) => n + d.light);
       setRun((p) => (p ? { ...p, streak: d.streak, best: d.best, lives: d.lives, alive: d.alive, done: p.done + 1 } : p));
       if (v.isCorrect) {
         const record = bestBefore.current > 0 && d.streak === bestBefore.current + 1;
@@ -548,7 +552,7 @@ export default function SurvivalGame({
             <div className="sv-card sv-nums">
               <div><b>{run.best}</b><span>лучшая серия{record ? ', рекорд' : ''}</span></div>
               <div><b>{board.total > 1 && board.mine > 0 ? `${board.place} из ${board.total}` : '—'}</b><span>{week.scope === 'group' ? 'место в группе' : 'место в школе'} за неделю</span></div>
-              <div><b>{run.done}</b><span>{plural(run.done, 'задача', 'задачи', 'задач')} в серии</span></div>
+              <div><b>+{light}</b><span>света за {run.done} {plural(run.done, 'задачу', 'задачи', 'задач')}</span></div>
             </div>
             {board.rows.length > 1 ? (
               <div className="sv-card">

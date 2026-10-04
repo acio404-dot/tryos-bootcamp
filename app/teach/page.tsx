@@ -10,6 +10,7 @@ import {
 import { plural } from '@/lib/format';
 import { streaksOf } from '@/lib/streak';
 import { mockBatches } from '@/lib/mock';
+import { homeworkOfGroups, homeworkTopics } from '@/lib/homework';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Кабинет учителя' };
@@ -35,7 +36,7 @@ export default async function Teach() {
   const ids = groups.map((g) => g.id);
   const now = nowInTz();
 
-  const [students, events, scores, mocks, exams] = await Promise.all([
+  const [students, events, scores, mocks, exams, homework] = await Promise.all([
     db<Omit<TStudent, 'streak' | 'bound' | 'last_score'> & { user_id: string | null; last_score: number | null }>`select s.id, s.name, s.user_id, m.group_id,
         s.phone, s.note, s.exam_name, to_char(s.exam_date, 'YYYY-MM-DD') as exam_date, s.exam_city, s.target_score,
         (select t.score from bc_tests t where t.student_id = s.id or (s.user_id is not null and t.user_id = s.user_id)
@@ -49,7 +50,9 @@ export default async function Teach() {
         to_char(at at time zone ${TZ}, 'YYYY-MM-DD') as day, to_char(at at time zone ${TZ}, 'HH24:MI') as time
       from bc_events where (group_id = any(${ids}::int[])
           or student_id in (select student_id from bc_members where group_id = any(${ids}::int[])))
-        and at > now() - interval '1 day' order by at limit 100`,
+        and at > now() - interval '1 day'
+        and (batch is null or batch not like 'hw:%') -- сроки домашек ведёт вкладка «Домашка»
+      order by at limit 100`,
     db<TScore>`select sc.id, sc.student_id, s.name as student, sc.title, sc.value::float as value, sc.max::float as max,
         to_char(sc.date, 'YYYY-MM-DD') as date
       from bc_scores sc join bc_students s on s.id = sc.student_id
@@ -59,6 +62,7 @@ export default async function Teach() {
     db<{ title: string; day: string; group_id: number }>`select title, group_id, to_char(at at time zone ${TZ}, 'YYYY-MM-DD') as day
       from bc_events where kind = 'exam' and group_id = any(${ids}::int[]) and at > now() - interval '180 days' and at < now() + interval '1 day'
       order by at desc limit 60`,
+    homeworkOfGroups(ids),
   ]);
   const streaks = await streaksOf(students.map((s) => s.user_id || ''));
   const people: TStudent[] = students.map(({ user_id, ...s }) => ({ ...s, bound: Boolean(user_id), streak: user_id ? streaks[user_id] || 0 : 0 }));
@@ -91,7 +95,7 @@ export default async function Teach() {
         </div>
       </div>
       {groups.length ? (
-        <TeachPanel groups={groups} students={people} lessons={lessons} events={events} scores={scores} mocks={mocks} exams={exams} today={now.date} />
+        <TeachPanel groups={groups} students={people} lessons={lessons} events={events} scores={scores} mocks={mocks} exams={exams} today={now.date} homework={homework} hwTopics={homeworkTopics()} />
       ) : (
         <div className="card empty-card">
           <h2>Групп пока нет</h2>
