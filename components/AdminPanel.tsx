@@ -24,6 +24,8 @@ import MockResults from './MockResults';
 import { adminConnectWebhook, adminRunReminders } from '@/lib/notify-actions';
 import type { MockBatch } from '@/lib/mock';
 import { DOW, dateShort, plural, todayIso } from '@/lib/format';
+import HomeworkPanel, { type HwTopic } from './HomeworkPanel';
+import type { TeacherHomework } from '@/lib/homework';
 
 /** '2027-04-11' → '11 апр 2027' (год — только если не текущий). */
 function short(iso: string | null | undefined): string {
@@ -186,7 +188,7 @@ const invite = (id: string, name: string) =>
 /* ============================================================ панель */
 
 export default function AdminPanel({
-  students, groups, members, scores, events, teachers, mocks, mockExams, today, tg, server,
+  students, groups, members, scores, events, teachers, mocks, mockExams, today, tg, server, homework, hwTopics,
 }: {
   students: AStudent[];
   groups: AGroup[];
@@ -199,8 +201,10 @@ export default function AdminPanel({
   today: string;
   tg: TgInfo;
   server: ServerInfo;
+  homework: TeacherHomework[];
+  hwTopics: HwTopic[];
 }) {
-  const [tab, setTab] = useState<'students' | 'teachers' | 'group' | 'solo' | 'events' | 'mocks' | 'exam' | 'tg' | 'server'>('students');
+  const [tab, setTab] = useState<'students' | 'teachers' | 'group' | 'solo' | 'events' | 'homework' | 'mocks' | 'exam' | 'tg' | 'server'>('students');
   const inGroups = groups.filter((g) => !isSolo(g));
   const solos = groups.filter(isSolo);
   const planned = events.filter((e) => e.batch).length;
@@ -223,6 +227,9 @@ export default function AdminPanel({
         <button type="button" role="tab" aria-selected={tab === 'events'} className={tab === 'events' ? 'on' : ''} onClick={() => setTab('events')}>
           Занятия и тесты{planned ? ` · ${planned}` : ''}
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'homework'} className={tab === 'homework' ? 'on' : ''} onClick={() => setTab('homework')}>
+          Домашка{homework.filter((h) => !h.overdue).length ? ` · ${homework.filter((h) => !h.overdue).length}` : ''}
+        </button>
         <button type="button" role="tab" aria-selected={tab === 'mocks'} className={tab === 'mocks' ? 'on' : ''} onClick={() => setTab('mocks')}>
           Баллы за пробники{mocks.length ? ` · ${mocks.length}` : ''}
         </button>
@@ -238,6 +245,11 @@ export default function AdminPanel({
       </div>
       {tab === 'students' ? (
         <StudentsTab students={students} groups={groups} members={members} scores={scores} events={events} />
+      ) : tab === 'homework' ? (
+        <HomeworkPanel
+          groups={groups.map((g) => ({ id: g.id, title: g.name ? `${g.course} · ${g.name}` : g.course, solo: isSolo(g) }))}
+          topics={hwTopics} list={homework} today={today}
+        />
       ) : tab === 'server' ? (
         <ServerTab s={server} />
       ) : tab === 'tg' ? (
