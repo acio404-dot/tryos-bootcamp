@@ -3,10 +3,11 @@ import { currentUser } from '@/lib/auth';
 import { checkAnswer, itemById, survivalPick, toPublic } from '@/lib/bank';
 import { publicShadow } from '@/lib/shadows';
 import {
-  applySurvivalAnswer, claimSurvivalAnswer, createSurvival, endSurvival, recordAttempt, setSurvivalCurrent,
+  aliasId, applySurvivalAnswer, claimSurvivalAnswer, createSurvival, endSurvival, recordAttempt, setSurvivalCurrent,
   survivalRun, SURVIVAL_GRACE, SURVIVAL_LIVES, SURVIVAL_SECONDS, type Survival,
 } from '@/lib/runs';
 import { solvedToday, streakUpdate } from '@/lib/streak';
+import { LIGHT, addLight } from '@/lib/light';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,8 @@ async function nextQuestion(runId: string, streak: number, seen: string[]) {
   if (!item) return { question: null, shadow: null };
   const keep = [...seen, item.id].slice(-400);
   await setSurvivalCurrent(runId, item.id, keep);
-  return { question: toPublic(item), shadow: publicShadow(item.topic) };
+  // настоящий id задачи в браузер не уходит: по нему ответ можно было бы узнать в тренажёре
+  return { question: toPublic(item, aliasId(runId, item.id)), shadow: publicShadow(item.topic) };
 }
 
 /*
@@ -54,7 +56,7 @@ export async function POST(req: Request) {
     const item = run.alive && run.cur_id ? itemById(run.cur_id) : undefined;
     return {
       streak: run.streak, best: run.best, lives: run.lives, alive: run.alive, n: run.asked,
-      question: item ? toPublic(item) : null,
+      question: item ? toPublic(item, aliasId(run.id, item.id)) : null,
       shadow: item ? publicShadow(item.topic) : null,
     };
   };
@@ -91,12 +93,12 @@ export async function POST(req: Request) {
   if (body.action === 'answer') {
     // Вкладка, открытая до обновления сайта, не присылает qid и ждёт следующую задачу вместе с вердиктом.
     const legacy = typeof body.qid !== 'string';
-    let qid = legacy ? '' : String(body.qid);
-    if (legacy) {
-      const cur = await survivalRun(user.id, runId);
-      if (!cur) return NextResponse.json({ error: 'Серия не найдена' }, { status: 404 });
-      qid = cur.cur_id || '';
-    }
+    // Браузер знает задачу только под подставным id: сверяем его с текущей задачей серии.
+    // (Вкладки, открытые до этого обновления, присылают настоящий id — он тоже подходит.)
+    const cur0 = await survivalRun(user.id, runId);
+    if (!cur0) return NextResponse.json({ error: 'Серия не найдена' }, { status: 404 });
+    const sent = legacy ? '' : String(body.qid);
+    const qid = cur0.cur_id && (legacy || sent === aliasId(runId, cur0.cur_id) || sent === cur0.cur_id) ? cur0.cur_id : '';
     const run = qid ? await claimSurvivalAnswer(user.id, runId, qid) : null;
     if (!run) {
       // серии нет, она закончилась, или ответ на эту задачу уже принят
@@ -128,6 +130,9 @@ export async function POST(req: Request) {
     );
 
     const after = await applySurvivalAnswer(run, ok, { id: qid, topic: v.topic, timedOut });
+    // Свет за верный ответ: +10 и ещё +3, если быстрее темпа экзамена (75 секунд).
+    const light = ok ? LIGHT.correct + (seconds !== null && seconds <= LIGHT.tempo ? LIGHT.fast : 0) : 0;
+    if (light) await addLight(user.id, light, 'survival', `${run.id}:${run.asked}`);
     const next = legacy && after.alive ? await nextQuestion(after.id, after.streak, after.seen) : {};
 
     return NextResponse.json({
@@ -136,6 +141,7 @@ export async function POST(req: Request) {
       best: after.best,
       lives: after.lives,
       alive: after.alive,
+      light,
       ...next,
       streakUp: await streakUpdate(user.id, before),
     });
