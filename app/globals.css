@@ -386,6 +386,8 @@ a.rowlink:hover{border-color:var(--ink);transform:translateX(2px)}
 .auth{min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .auth-side{position:relative;overflow:hidden;background:radial-gradient(90% 70% at 30% 100%,#3b2a6e 0%,#1b1342 44%,var(--night) 100%);color:var(--cream);padding:44px 48px;display:flex;flex-direction:column;justify-content:space-between;gap:26px}
 .auth-side .brand img{height:52px}
+.auth-side .brand-anim{align-self:flex-start;margin:-34px 0 -18px -12px}
+.auth-side .brand-anim img{width:318px;max-width:100%;height:auto}
 .auth-side h1{font-family:var(--display);font-weight:800;font-size:clamp(28px,3.2vw,42px);letter-spacing:-.05em;line-height:1.06;margin:0 0 14px;text-wrap:balance}
 .auth-side h1 em{font-style:normal;color:var(--lamp)}
 .auth-side p{color:var(--dim-n);font-weight:600;max-width:44ch;margin:0}
@@ -992,6 +994,8 @@ a.rowlink:hover{border-color:var(--ink);transform:translateX(2px)}
   .auth{grid-template-columns:minmax(0,1fr)}
   .auth-side{padding:22px 20px 24px;gap:16px}
   .auth-side .brand img{height:38px}
+  .auth-side .brand-anim{margin:-14px 0 -12px -7px}
+  .auth-side .brand-anim img{width:204px;height:auto}
   .auth-side h1{font-size:25px;margin-bottom:8px}
   .auth-nur{margin-bottom:14px}
   .auth-nur img{width:76px}
